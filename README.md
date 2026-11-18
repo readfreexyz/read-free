@@ -1,9 +1,18 @@
 # Read Free
 
-A Chrome extension that replaces a paywalled article's text with the text of the newest
-[archive.today](https://archive.ph) snapshot of the same page. It works on **The New York Times**,
-the **Financial Times**, **The Atlantic** and **The New Yorker**. On NYT stories behind the "free to read, log in to continue" wall, it
-just removes the wall.
+A Chrome extension that opens the paywalled articles of news outlets boycotted over their
+coverage of Israel's genocide in Gaza, so you can read them without paying them. The first time
+you read each outlet, it tells you why it's boycotted, with the source.
+
+Where a wall only covers text the page already has, it takes the wall off, with nothing fetched.
+Otherwise it puts in the text of the newest [archive.today](https://archive.ph) snapshot of the
+article. The table under [How it works](#how-it-works) says which each site gets.
+
+It works on 25 outlets: ABC (Spain), The Age, The Atlantic, CNN, Corriere della Sera, Daily Mail,
+Der Spiegel, El Mundo, Financial Times, The Globe and Mail, The Independent, La Libre Belgique,
+Le Monde, Los Angeles Times, National Post, The New York Times, The New Yorker, Newsweek, NRC,
+Reuters, The Spectator, The Sydney Morning Herald, Toronto Star, USA Today and The Wall Street
+Journal.
 
 For personal use only. It goes against the publishers' terms, and the Chrome Web Store doesn't
 allow paywall-bypass extensions, so it's loaded unpacked.
