@@ -211,7 +211,7 @@ monthly) inside the page, and any other ways as links.
   Up to 5 ways, in the order shown. When the first is a Ko-fi page it gets Ko-fi's panel; the
   rest are links. `"ways": []` pauses donations: the page says so and offers only UNRWA (the menu, the settings page
   and the status bar still lead to it). Its host
-  must send `Access-Control-Allow-Origin: *` (GitHub Pages does).
+  must send `Access-Control-Allow-Origin: *` (GitHub Pages does; Cloudflare does because of `website/_headers`).
 - **Checked as if hostile** (a lost or seized domain is what it's for): names and notes are plain
   text; links must be `https` to a known donation service (`HOSTS` in `donations.js`: Ko-fi,
   Liberapay, Open Collective, Buy Me a Coffee, Patreon, PayPal's donate links, GitHub Sponsors,
@@ -306,6 +306,7 @@ The content script picks the adapter for the current host. See
 | `extension/popup/` | The toolbar menu. `view.js` turns the tab's state (asked of its content script with `nytfix:state`) and the settings into words and a button. |
 | `extension/options/` | The settings page. |
 | `extension/give/` | The donation page: what you withheld, UNRWA's link, and the ways to give to Read Free (Ko-fi's donation panel, other links). |
+| `website/_headers` | Makes Cloudflare send `Access-Control-Allow-Origin: *` with every file of the site, so the extension can read `latest.txt` and `donate.json`. |
 | `website/donate.json` | The list of ways to give, to publish on Read Free's site (see [Donating](#donating)). |
 | `website/index.html` | The site's front page: the install command, the zip, the steps in Chrome and the outlets. `tools/release.sh build` writes the release in (see [docs/auto-update.md](docs/auto-update.md)). |
 | `website/install.sh` | Installs the newest signed release on macOS or Linux and updates it every hour (see [docs/auto-update.md](docs/auto-update.md)). |

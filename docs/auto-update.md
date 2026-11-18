@@ -16,7 +16,7 @@ A release is these files, uploaded to the site and to each mirror (`RELEASE_URLS
 - `latest.txt.sig`: its signature, by the release key (`ssh-keygen -Y sign`, namespace `read-free-release`).
 - `install.sh`: the install script, with the key's public half (`SIGNER`) and the addresses written in.
 - `index.html`: the front page (`website/index.html`), with the release's version, date, zip, size and SHA-256 and the site's address written in. It shows the install command and the zip, the steps in Chrome, and the outlets. It loads nothing from elsewhere; its one script makes the command use the address the page is served from, if that's a plain https one (so a mirror installs from itself), and adds a Copy button. Without the script the page is complete.
-- The rest of `website/`, such as `donate.json`.
+- The rest of `website/`: `donate.json`, and `_headers`, which tells Cloudflare to send `Access-Control-Allow-Origin: *` with every file (GitHub Pages sends it anyway, and serves `_headers` as a plain file).
 
 ### Installing
 
@@ -45,7 +45,7 @@ The hourly job runs the installed copy of the script, never a fresh download: a 
 
 ### The menu's notice
 
-For those who load a folder by hand (`extension/src/release.js`): when the toolbar menu opens, at most once a day (an hour after a failed try), it reads `latest.txt` from the first address that answers. If the version is newer than the one running and the release is a day old, the menu says "Read Free <version> is out" and links to the first address. A day, so those who installed with the script, updated within the hour, never see it. Only the version and date are taken from the file, and the link is built in. The request carries no cookies, referrer or query; it's never made from article pages or on a timer. The host must send `Access-Control-Allow-Origin: *` (GitHub Pages does).
+For those who load a folder by hand (`extension/src/release.js`): when the toolbar menu opens, at most once a day (an hour after a failed try), it reads `latest.txt` from the first address that answers. If the version is newer than the one running and the release is a day old, the menu says "Read Free <version> is out" and links to the first address. A day, so those who installed with the script, updated within the hour, never see it. Only the version and date are taken from the file, and the link is built in. The request carries no cookies, referrer or query; it's never made from article pages or on a timer. The host must send `Access-Control-Allow-Origin: *`: GitHub Pages does, and Cloudflare does because of `website/_headers`.
 
 ### Setting it up, once
 
