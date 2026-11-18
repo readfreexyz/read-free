@@ -311,6 +311,7 @@ The content script picks the adapter for the current host. See
 | `website/index.html` | The site's front page: the install command, the zip, the steps in Chrome and the outlets. `tools/release.sh build` writes the release in (see [docs/auto-update.md](docs/auto-update.md)). |
 | `website/install.sh` | Installs the newest signed release on macOS or Linux and updates it every hour (see [docs/auto-update.md](docs/auto-update.md)). |
 | `tools/release.sh` | Makes the release signing key (`keygen`), and builds and signs a release into `dist/` (`build`). |
+| `tools/publish.sh` | Publishes `dist/` to the site (a Cloudflare Worker) and its mirror (GitHub Pages), then waits until both serve it (see [docs/auto-update.md](docs/auto-update.md)). |
 | `extension/ui/` | Shared by the menu and the settings page: `ui.css` (buttons, switches, the band), `theme.css` (the active theme's colors), `sites.js` (loads the adapters the manifest lists, and finds the one for a host). |
 | `extension/themes/` | The themes; see [Themes](#themes). `tools/theme.mjs` switches between them. |
 | `extension/content.css` | Styles the banner, the loading placeholder and photos, in the active theme's colors (the marked block at the top). (Wall-hiding CSS is per site, in `sites/`.) |
