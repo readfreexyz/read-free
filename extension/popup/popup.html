@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Read Free</title>
+  <link rel="stylesheet" href="../ui/theme.css">
+  <link rel="stylesheet" href="../ui/ui.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="nf-band" aria-hidden="true"></div>
+  <header class="nf-brand">
+    <img src="../icons/icon.svg" alt="">
+    <span>Read Free</span>
+    <span class="nf-version" id="version"></span>
+  </header>
+  <!-- A newer version, for those who loaded the folder by hand (src/release.js) -->
+  <a class="newer" id="newer" target="_blank" rel="noopener noreferrer" hidden><span id="newer-text"></span><span class="newer-go">Get it &#x2197;</span></a>
+
+  <section class="page" aria-live="polite">
+    <div class="site">
+      <span class="site-name" id="site-name"></span>
+      <span class="site-host nf-muted" id="site-host"></span>
+    </div>
+    <p class="state" id="state" data-tone="neutral"><span class="nf-dot"></span><span id="state-text"></span></p>
+    <button type="button" class="nf-button" id="action" hidden></button>
+  </section>
+
+  <section class="why" id="why" hidden>
+    <p class="why-head" id="why-head"></p>
+    <p class="why-text"><span id="why-text"></span> <a id="why-source" target="_blank" rel="noopener noreferrer"></a></p>
+  </section>
+
+  <section class="tally" id="tally" hidden>
+    <p class="tally-head" id="tally-head"></p>
+    <div class="tally-main">
+      <p class="tally-value" id="tally-value"></p>
+      <dl class="tally-counts">
+        <div><dd id="tally-articles"></dd><dt id="tally-articles-label">articles</dt></div>
+        <div><dd id="tally-outlets"></dd><dt id="tally-outlets-label">outlets</dt></div>
+      </dl>
+    </div>
+    <p class="tally-note" id="tally-note"></p>
+    <a class="nf-button nf-primary tally-aid" id="tally-aid" target="_blank" rel="noopener noreferrer" hidden></a>
+    <a class="tally-project" id="tally-project" target="_blank" rel="noopener noreferrer" hidden>
+      <span class="donate-icon" aria-hidden="true"></span>Or give some to keep Read Free alive</a>
+    <p class="tally-since" id="tally-since" hidden></p>
+  </section>
+
+  <section class="switches">
+    <label class="switch-row" id="site-row" hidden>
+      <span class="switch-label">On <span id="site-short"></span></span>
+      <input type="checkbox" role="switch" class="nf-switch" id="site-switch">
+    </label>
+    <label class="switch-row">
+      <span class="switch-label">On all sites</span>
+      <input type="checkbox" role="switch" class="nf-switch" id="all-switch">
+    </label>
+  </section>
+
+  <footer>
+    <button type="button" class="nf-link" id="settings">Settings</button>
+    <a class="donate" id="donate" target="_blank" rel="noopener noreferrer" hidden>
+      <span class="donate-icon" aria-hidden="true"></span>
+      <span id="donate-text"></span>
+    </a>
+  </footer>
+
+  <script src="../src/archive.js"></script>
+  <script src="../src/settings.js"></script>
+  <script src="../src/update.js"></script>
+  <script src="../src/release.js"></script>
+  <script src="../src/tally.js"></script>
+  <script src="../src/notify.js"></script>
+  <script src="../src/reasons.js"></script>
+  <script src="../ui/sites.js"></script>
+  <script src="view.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

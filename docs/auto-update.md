@@ -1,0 +1,131 @@
+# Updating itself
+
+Sites change, so the extension needs updates. The Chrome Web Store doesn't allow extensions that take off paywalls, and Chrome on a Mac only installs a self-hosted `.crx` under an enterprise policy. So Read Free is loaded unpacked, and the folder Chrome loads is kept up to date from outside Chrome. Two ways:
+
+- **Readers:** signed releases, installed and updated by `website/install.sh` (macOS and Linux). Those who load a folder by hand instead are told in the toolbar menu when a new version is out.
+- **The maintainer's Mac:** a git clone that a LaunchAgent pulls every hour (below, from [The release clone](#the-release-clone)).
+
+Either way, the extension notices the newer version on disk and reloads itself (`extension/src/update.js`, [below](#the-extension-reloads-itself)).
+
+## Signed releases
+
+A release is these files, uploaded to the site and to each mirror (`RELEASE_URLS`):
+
+- `read-free-<version>.zip`: the committed `extension/` folder (`git archive`), nothing else.
+- `latest.txt`: the newest release, in a few lines: `read-free-release 1`, then `version=`, `zip=` (the zip's name), `sha256=`, `size=` and `date=`.
+- `latest.txt.sig`: its signature, by the release key (`ssh-keygen -Y sign`, namespace `read-free-release`).
+- `install.sh`: the install script, with the key's public half (`SIGNER`) and the addresses written in.
+- `index.html`: the front page (`website/index.html`), with the release's version, date, zip, size and SHA-256 and the site's address written in. It shows the install command and the zip, the steps in Chrome, and the outlets. It loads nothing from elsewhere; its one script makes the command use the address the page is served from, if that's a plain https one (so a mirror installs from itself), and adds a Copy button. Without the script the page is complete.
+- The rest of `website/`, such as `donate.json`.
+
+### Installing
+
+```bash
+curl -fsSLO https://readfree.xyz/install.sh && sh install.sh
+```
+
+It downloads the newest release, checks it, unpacks it into `~/Library/Application Support/Read Free/extension` (Linux: `~/.local/share/read-free/extension`), keeps a copy of itself next to it as `update.sh`, and schedules `update.sh update` every hour: a LaunchAgent (`local.readfree.update`) on macOS, a crontab line on Linux. Then, once, in Chrome: Developer mode on, **Load unpacked**, that folder. Developer mode must stay on (see [The extension reloads itself](#the-extension-reloads-itself)).
+
+`sh install.sh status` shows the folder, the version and the log; `sh install.sh uninstall` stops the updates. `install --no-schedule` installs without them.
+
+### What an update checks
+
+Each hour, `update.sh` asks the addresses in turn, moving on when one doesn't answer or answers with something that doesn't check out. The first signed release decides. What went wrong with an address is logged only if the run ends in an update or a failure, so a mirror that's down isn't news every hour. It installs a release only if:
+
+1. `latest.txt` came over https (redirects included), and is at most 4 KB;
+2. its signature checks out, by exit status, against the key in the script, for the `read-free-release` namespace. Nothing in it is read before that;
+3. every field is what it should be: the version is 1 to 4 numbers, the zip's name is `read-free-<that version>.zip` (no path), the SHA-256 is 64 hex digits, the size is at most 50 MB;
+4. the version is newer than the one installed, numerically (0.14.10 is newer than 0.14.9). An older or equal one, even signed, is left alone;
+5. the zip, from the same address, has the signed size and SHA-256;
+6. it unpacks, and its `manifest.json` has that version.
+
+Then it moves the installed folder aside and the new one in (renames within the same folder; the old one is put back if the second rename fails), under a lock so two runs can't overlap. A refused release leaves the installed folder as it was, and nothing behind.
+
+The hourly job runs the installed copy of the script, never a fresh download: a site or mirror in the wrong hands can't put code in anyone's browser without the key. It can only withhold updates, or serve an older signed release, which isn't installed. It could give a new install a different `install.sh`: install from the site you trust. Running a newer `install.sh` by hand replaces the installed copy, which is how the script itself is updated.
+
+### The menu's notice
+
+For those who load a folder by hand (`extension/src/release.js`): when the toolbar menu opens, at most once a day (an hour after a failed try), it reads `latest.txt` from the first address that answers. If the version is newer than the one running and the release is a day old, the menu says "Read Free <version> is out" and links to the first address. A day, so those who installed with the script, updated within the hour, never see it. Only the version and date are taken from the file, and the link is built in. The request carries no cookies, referrer or query; it's never made from article pages or on a timer. The host must send `Access-Control-Allow-Origin: *` (GitHub Pages does).
+
+### Setting it up, once
+
+1. `tools/release.sh keygen` makes the release key, `~/.config/read-free/release-key`, and asks for a passphrase. Keep the key and its passphrase safe, with a backup: installed copies only take updates signed by it, and a new key means everyone reinstalling. Its public half is written into `website/install.sh` as `SIGNER`, with the comment `read-free`, not your user and host name.
+2. Put the addresses, the site first, each ending in `/`, in both `RELEASE_URLS` lists: `extension/src/settings.js` and `website/install.sh`. A test checks they match. Choose them to last: an update replaces the extension, never the script, so every installed copy keeps asking the addresses it was installed with until its owner runs a newer `install.sh` by hand. A domain you control outlasts an address tied to an account or a host, and a mirror listed from the first release is one every reader already has. The menu's link goes to the first address itself: the front page. `build` refuses without an address, or with a first one that isn't plain (letters, digits, `.`, `-`, `_`, `~`, `/`), since the page puts it in a command people paste into a shell.
+3. Commit both.
+
+### Releasing
+
+1. Bump `"version"` in `extension/manifest.json`, run `npm test`, commit, push.
+2. `tools/release.sh build`: `dist/` gets the zip, `latest.txt` and its signature (it asks for the key's passphrase), `install.sh`, the front page with the release written in, and the rest of `website/`. It checks the signature as an installed copy would.
+3. Upload everything in `dist/` to the site and each mirror.
+
+Readers who installed with the script have it within the hour; the menu tells the rest a day later.
+
+## The release clone
+
+The maintainer's own copy follows the repository instead:
+
+1. **The release copy.** A clone of the repository's `main`, by default in `~/Library/Application Support/NYT Fixer`. Chrome loads its `extension/` folder unpacked. Nobody works in it: it only ever holds pushed commits.
+2. **The LaunchAgent** (`local.nytfixer.update`). At login, and every hour, it runs `git pull --ff-only` in that clone, with git's own GitHub login (the keychain).
+   - Its command is written into the plist, so nothing from the repository runs outside Chrome. A clone has no hooks.
+   - It logs failed pulls, and each update, to `~/Library/Logs/NYT Fixer/update.log`.
+3. **The extension** reloads itself, as below.
+
+The folder, the LaunchAgent's label and the log folder keep the project's first name, NYT Fixer. Chrome knows an unpacked extension by its folder: moving it would make it a new extension, with default settings and an empty tally.
+
+So a fix reaches the browser within about an hour of the push. Pages already open keep the version they started with until they're reloaded.
+
+## The extension reloads itself
+
+`extension/src/update.js`, loaded by `background.js`. Every minute it reads `manifest.json` from disk. If its version is newer than the one running, it reloads itself with `chrome.runtime.reload()`, which reads the folder again. It won't reload:
+   - the first time it sees a new version. The version must still be there a minute later, so a pull that is still writing isn't loaded halfway.
+   - if a file the new version names is missing. That covers the service worker, its `importScripts`, content scripts, styles, pages and icons. An unpacked extension that fails to load stays off until someone reloads it by hand, and this check goes down with it.
+   - while an archive.today download is in flight, or while the toolbar menu or one of its pages is open. It waits up to 30 minutes, then reloads anyway.
+
+Developer mode must stay on: Chrome turns unpacked extensions off without it, and a reload is when it notices (`DISABLE_UNSUPPORTED_DEVELOPER_EXTENSION` in `chrome://extensions-internals`). Pages already open keep the version they started with until they're reloaded.
+
+## Releasing to the release clone
+
+- Bump `"version"` in `extension/manifest.json`, commit, push to `main`.
+- A pushed change without a new version stays on disk unloaded until the next version comes along.
+- The version must go up. A lower one is never loaded.
+- Run `npm test` first. A service worker that doesn't run anymore (a syntax error, a bad `importScripts`) also stops the update check. The fix would then need a reload by hand.
+
+## Setting up the release clone
+
+```bash
+tools/auto-update.sh install
+```
+
+This clones the repository (if it isn't there yet), writes the LaunchAgent to `~/Library/LaunchAgents/local.nytfixer.update.plist`, loads it and pulls once. Then, in Chrome:
+
+1. `chrome://extensions`, Developer mode on.
+2. **Load unpacked**, then the release copy's `extension` folder. `~/Library` is hidden in the file dialog: press Cmd+Shift+G and paste `~/Library/Application Support/NYT Fixer/extension`.
+3. Turn **Allow in Incognito** on, under **Details**, if you want it in private windows.
+4. Turn off the copy that loads from the project folder (see below).
+5. Keep Developer mode on. Chrome turns unpacked extensions off without it, and a reload is when it notices: the update's reload would switch the extension off (`DISABLE_UNSUPPORTED_DEVELOPER_EXTENSION` in `chrome://extensions-internals`).
+
+The new copy has a new extension ID. Chrome derives an unpacked extension's ID from its folder. So it starts with default options and an empty cache of archived pages.
+
+`tools/auto-update.sh status` shows where everything is, the versions and the log. `tools/auto-update.sh uninstall` unloads and deletes the LaunchAgent. The clone stays; delete it once Chrome no longer loads it.
+
+## Trying out work that isn't pushed
+
+The project folder can stay installed as a second, separate copy, normally off. To try a change before it's committed:
+
+1. In `chrome://extensions`, turn the release copy off and the project-folder copy on.
+2. Reload the project-folder copy.
+3. Afterwards, switch back.
+
+Never leave both on: both would act on every page. The two copies keep separate options. The project-folder copy also reloads itself when its version goes up.
+
+## Checking it
+
+- `npm test`: `test/update.test.js` (the reload), `test/release.test.js` (the menu's notice) and `test/install.test.js`. That one builds and signs releases with a throwaway key, serves them over https from localhost, and installs and updates into a temporary home with `--no-schedule`: a newer release, an older and the same one, then each kind of bad one (an edited `latest.txt`, another key, another namespace, a different zip, a truncated one, a zip holding another version, a zip name with a path, plain http, no key), each leaving the installed folder as it was. It never schedules anything. It also checks the front page `build` wrote, and that `build` refuses without a plain address. `test/website.test.js` checks the page itself: its outlets are the extension's live sites, it loads nothing from elsewhere, its script has the hash its CSP allows (the test says the new one after a change), `build` fills each of its fields, and the command follows the page's address only when that's plain.
+- `node tools/auto-update-check.mjs`: about 12 minutes, offline. It runs the whole loop in a headless Google Chrome with a profile of its own, deleted afterwards (`--chromium` to pick another browser):
+  - A bare repository stands in for GitHub. A clone of it is loaded as **Load unpacked** loads it, with Developer mode on.
+  - It pushes four releases and pulls each with the LaunchAgent's command:
+    - two ordinary ones, with the service worker left to stop before each: each must load, new code included;
+    - one whose manifest names a missing file: it must not load;
+    - the one that adds the file: it must.
+  - It tests the repository's committed HEAD; `--source` points it at another.

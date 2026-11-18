@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support Read Free</title>
+  <link rel="stylesheet" href="../ui/theme.css">
+  <link rel="stylesheet" href="../ui/ui.css">
+  <link rel="stylesheet" href="give.css">
+</head>
+<body>
+  <div class="nf-band" aria-hidden="true"></div>
+  <header class="top">
+    <div class="top-inner">
+      <img class="logo" src="../icons/icon.svg" alt="">
+      <div>
+        <h1 id="title">Keep Read Free alive</h1>
+        <p class="lede" id="lede">Read Free is reader-funded. What you give keeps it working as the
+          outlets change their walls, and keeps the boycott going.</p>
+      </div>
+    </div>
+  </header>
+
+  <main id="steps">
+    <!-- 1. What the reader withheld: most of it to UNRWA (only once there's a tally with a cost) -->
+    <section class="step aid-step" id="aid-step" hidden>
+      <div class="aid-figure">
+        <p class="step-head"><span class="step-number">1</span>Most of it: Palestinians</p>
+        <p class="withheld-value" id="withheld-value"></p>
+        <p class="withheld-label" id="withheld-label"></p>
+      </div>
+      <div class="aid-action">
+        <a class="aid" id="aid" target="_blank" rel="noopener noreferrer"></a>
+        <p class="aid-note">UNRWA's own donation page; you choose the amount there.</p>
+      </div>
+    </section>
+
+    <!-- 2. Some of it: Read Free. The ways to give come from src/donations.js: the first in
+         Ko-fi's panel when it's a Ko-fi page, the rest as links. -->
+    <section class="step tip-step" id="tip-step" hidden>
+      <div class="tip-about">
+        <p class="step-head"><span class="step-number">2</span><span id="tip-head">Give to Read Free</span></p>
+        <p class="tip-text">Read Free is reader-funded. What you give keeps the boycott readable:</p>
+        <ul class="pays">
+          <li>Fixes when an outlet changes its wall</li>
+          <li>New outlets from the boycott list</li>
+          <li>No ads, no tracking, no account</li>
+        </ul>
+        <div class="others" id="others" hidden>
+          <p class="others-head">Other ways to give</p>
+          <ul class="ways compact" id="others-list"></ul>
+        </div>
+        <p class="privacy" id="privacy"></p>
+        <p class="fallback" id="fallback" hidden>Trouble with the panel?
+          <a id="panel-link" target="_blank" rel="noopener noreferrer"></a></p>
+      </div>
+      <div class="panel" id="panel" hidden>
+        <iframe id="kofi" title="Donate to Read Free"></iframe>
+      </div>
+      <ul class="ways" id="ways" hidden></ul>
+    </section>
+
+    <!-- No ways to give: donations are paused (an empty list), or none is set up -->
+    <section class="paused" id="paused" hidden>
+      <p id="paused-text">Read Free isn't taking donations right now.</p>
+      <a class="aid" id="paused-aid" target="_blank" rel="noopener noreferrer" hidden></a>
+    </section>
+  </main>
+
+  <script src="../src/archive.js"></script>
+  <script src="../src/settings.js"></script>
+  <script src="../src/donations.js"></script>
+  <script src="../src/tally.js"></script>
+  <script src="../src/notify.js"></script>
+  <script src="give.js"></script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Read Free settings</title>
+  <link rel="stylesheet" href="../ui/theme.css">
+  <link rel="stylesheet" href="../ui/ui.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="nf-band" aria-hidden="true"></div>
+  <header class="top">
+    <div class="top-inner">
+      <img class="logo" src="../icons/icon.svg" alt="">
+      <div class="title">
+        <h1>Read Free</h1>
+        <p class="tagline" id="tagline">Read the news. Don't fund it.</p>
+      </div>
+      <span class="nf-version" id="version"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card tally" id="tally">
+      <h2>Your boycott</h2>
+      <p class="hint" id="tally-empty">Nothing counted yet. Each article Read Free opens for you is counted here.</p>
+      <div id="tally-body" hidden>
+        <div class="headline">
+          <div class="hero">
+            <p class="hero-eyebrow" id="hero-eyebrow"></p>
+            <p class="hero-value" id="hero-value"></p>
+            <p class="hero-note" id="hero-note"></p>
+          </div>
+          <dl class="stats" id="stats"></dl>
+        </div>
+        <div class="give">
+          <div class="give-row">
+            <a class="nf-button give-aid" id="give-aid" target="_blank" rel="noopener noreferrer" hidden></a>
+            <p class="give-note" id="give-note" hidden>Opens UNRWA's own donation page;<br>you choose the amount there.</p>
+          </div>
+          <a class="nf-button give-project" id="give-project" target="_blank" rel="noopener noreferrer" hidden>
+            <span class="give-icon" aria-hidden="true"></span>Or give some of it to keep Read Free alive</a>
+        </div>
+        <h3 class="outlets-head" id="outlets-head"></h3>
+        <ul class="outlets" id="tally-sites"></ul>
+      </div>
+      <p class="hint tally-how">An outlet you read behind its paywall in a month counts its cheapest
+        digital subscription for that month, once, however many of its articles you read: the regular
+        price, not the introductory offer<span id="tally-dates"></span>. Each price links to where it
+        comes from; an outlet with none found isn't counted. The count is kept on this computer and
+        never sent anywhere.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Sites <span class="count" id="site-count"></span></h2>
+          <p class="hint">Where Read Free takes the walls down. A site turned off is left as it sends its pages.</p>
+        </div>
+        <label class="all-sites">
+          <span>All sites</span>
+          <input type="checkbox" role="switch" class="nf-switch" id="all-switch">
+        </label>
+      </div>
+      <ul class="sites" id="sites"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Notifications</h2>
+      <p class="hint">After your first few articles, Read Free speaks up only when it has something
+        new to say: the first time you read an outlet, why it's boycotted, and now and then a link
+        to donate. The &#10003; on its toolbar icon always shows when a wall came off.</p>
+      <label class="setting-row">
+        <span>Confirm every time a wall comes off</span>
+        <input type="checkbox" role="switch" class="nf-switch" id="confirm-switch">
+      </label>
+      <div class="row">
+        <button id="reasons-again" type="button" class="nf-button">Start notifications over</button>
+        <span id="reasons-status" class="saved" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><label for="mirror">archive.today address</label></h2>
+      <p class="hint">For articles a site never sends in full. archive.today answers under several
+        names; if the one in use stops loading (some networks and DNS services block it), pick another.</p>
+      <div class="row">
+        <select id="mirror"></select>
+        <span id="mirror-status" class="saved" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Saved articles</h2>
+      <p class="hint">Articles from archive.today are kept on this computer for 30 days (up to 50 MB,
+        oldest dropped first), so reloads and revisits are instant.</p>
+      <div class="row">
+        <button id="clear" type="button" class="nf-button">Clear saved articles</button>
+        <span id="clear-status" class="saved" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="card support" id="tip" hidden>
+      <span class="support-icon" aria-hidden="true"></span>
+      <div>
+        <h2>Support the project</h2>
+        <p class="hint">Read Free costs nothing. If it's useful to you, a donation keeps it going.</p>
+      </div>
+      <a id="tip-link" class="nf-button support-button" target="_blank" rel="noopener noreferrer">Donate</a>
+      <label class="donated">
+        <span>I've donated. Don't ask again.</span>
+        <input type="checkbox" role="switch" class="nf-switch" id="donated-switch">
+      </label>
+    </section>
+  </main>
+
+  <script src="../src/archive.js"></script>
+  <script src="../src/settings.js"></script>
+  <script src="../src/cache.js"></script>
+  <script src="../src/tally.js"></script>
+  <script src="../src/notify.js"></script>
+  <script src="../ui/sites.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

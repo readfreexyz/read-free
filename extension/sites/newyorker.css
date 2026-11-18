@@ -1,0 +1,11 @@
+/* The New Yorker (Condé Nast): hide the paywall modal before first paint, and show the
+   paragraphs past the free part (class "paywall") in case they're hidden while the wall is up.
+   When the reader asks for The New Yorker's version, .nytfix-off brings the wall back. */
+html:not(.nytfix-off) aside.paywall-modal {
+  display: none !important;
+}
+html:not(.nytfix-off) .body__inner-container .paywall {
+  display: revert !important;
+  visibility: visible !important;
+  max-height: none !important;
+}

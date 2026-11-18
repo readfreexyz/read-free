@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- icon.svg in greys: the extension is off. -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#8b929b"/>
+  <path d="M40 24H88a4 4 0 0 1 4 4V78L68 104H40a4 4 0 0 1-4-4V28a4 4 0 0 1 4-4Z" fill="#ffffff"/>
+  <path d="M92 78L68 104V82a4 4 0 0 1 4-4Z" fill="#d6dadf"/>
+  <g fill="#8b929b">
+    <rect x="46" y="36" width="36" height="8" rx="4"/>
+    <rect x="46" y="51" width="36" height="8" rx="4"/>
+    <rect x="46" y="66" width="36" height="8" rx="4"/>
+    <rect x="46" y="81" width="14" height="8" rx="4"/>
+  </g>
+</svg>

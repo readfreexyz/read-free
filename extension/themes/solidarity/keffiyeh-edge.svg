@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 16" width="18" height="16">
+  <!-- The keffiyeh's edge: bold bars with a row of olive leaves between. One colour: used as a
+       CSS mask, so the theme picks the colour. -->
+  <rect width="18" height="2"/>
+  <rect y="3.2" width="18" height=".8"/>
+  <path transform="translate(1 11.2) rotate(-32)" d="M0 0C2.4-2.3 6.6-2.3 9 0C6.6 2.3 2.4 2.3 0 0Z"/>
+  <path transform="translate(10 4.8) rotate(32)" d="M0 0C2.4-2.3 6.6-2.3 9 0C6.6 2.3 2.4 2.3 0 0Z"/>
+  <rect y="12" width="18" height=".8"/>
+  <rect y="14" width="18" height="2"/>
+</svg>

@@ -1,0 +1,6 @@
+/* The Atlantic's paywall service (Zephr) renders its gate into these slots at the end of the
+   article body. Hide them before first paint; the archived text replaces the cut body. When the
+   reader asks for The Atlantic's version, .nytfix-off brings them back. */
+html:not(.nytfix-off) section[data-event-module="article body"] [data-zephr-outcome-label] {
+  display: none !important;
+}

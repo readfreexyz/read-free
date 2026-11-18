@@ -1,0 +1,8 @@
+/* FT's barrier page (shown to non-subscribers instead of the article) holds the headline and
+   subscription offers. Before first paint, trim it to just the headline: hide every element in
+   it that neither is the h1, is inside the h1, nor contains it. The archived article then goes
+   right after it. When the reader asks for FT's version (or archive.today can't help), the
+   extension adds .nytfix-off and the whole barrier page shows again. */
+html:not(.nytfix-off) #barrier-page :not(:has(h1)):not(h1):not(h1 *) {
+  display: none !important;
+}

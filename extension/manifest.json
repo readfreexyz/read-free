@@ -1,0 +1,712 @@
+{
+  "manifest_version": 3,
+  "name": "Read Free",
+  "version": "0.21.0",
+  "description": "Takes paywalls off news articles (NYT, FT, The Atlantic, CNN and more), filling in cut text from archive.today.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Read Free",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "permissions": [
+    "alarms",
+    "storage",
+    "unlimitedStorage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://archive.ph/*",
+    "https://archive.is/*",
+    "https://archive.today/*",
+    "https://archive.md/*",
+    "https://archive.li/*",
+    "https://archive.vn/*",
+    "https://archive.fo/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.nytimes.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/nyt.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css",
+        "sites/nyt.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.ft.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/ft.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css",
+        "sites/ft.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.theatlantic.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/atlantic.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css",
+        "sites/atlantic.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.newyorker.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/newyorker.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css",
+        "sites/newyorker.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.cnn.com/*",
+        "https://edition.cnn.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/cnn.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.latimes.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/latimes.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.newsweek.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/newsweek.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.theglobeandmail.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/globeandmail.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.thestar.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/thestar.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.wsj.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/wsj.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.theage.com.au/*",
+        "https://www.smh.com.au/*"
+      ],
+      "js": [
+        "page/nine.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.theage.com.au/*",
+        "https://www.smh.com.au/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/nine.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.spiegel.de/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/spiegel.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.lemonde.fr/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/lemonde.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://nationalpost.com/*",
+        "https://www.nationalpost.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/nationalpost.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.corriere.it/*"
+      ],
+      "js": [
+        "page/corriere.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*.corriere.it/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/corriere.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://spectator.com/*",
+        "https://www.spectator.com/*",
+        "https://www.spectator.co.uk/*",
+        "https://spectator.co.uk/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/spectator.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.reuters.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/reuters.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.lalibre.be/*"
+      ],
+      "js": [
+        "page/piano-adblock.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.lalibre.be/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/lalibre.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.dailymail.co.uk/*",
+        "https://www.dailymail.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/dailymail.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.usatoday.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/usatoday.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.abc.es/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/abces.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.elmundo.es/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/elmundo.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.nrc.nl/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/nrc.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css",
+        "sites/nrc.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.independent.co.uk/*",
+        "https://www.the-independent.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/independent.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

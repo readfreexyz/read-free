@@ -1,0 +1,8 @@
+/* NRC's wall pins the page: html.disable-overflow-fixed { position: fixed; overflow: hidden }, in a
+   stylesheet (paywall.css) NRC loads only with the wall, possibly after the extension has lifted
+   it. While the wall is lifted (.nytfix-active), the class locks nothing, whenever its rule
+   arrives. When the reader asks for NRC's version, .nytfix-active goes and the lock with it. */
+html.nytfix-active.disable-overflow-fixed {
+  position: static !important;
+  overflow: visible !important;
+}

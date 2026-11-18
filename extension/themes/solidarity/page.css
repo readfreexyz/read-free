@@ -1,0 +1,30 @@
+/* On news pages (theme "solidarity"): the banner, the loading box where the cut-off text ends, and
+   the floating status bar (its host element; the colors reach into its shadow root). Scoped to
+   those elements, never the page's :root, and the same in light and dark: it's the site's page.
+   tools/theme.mjs copies this into content.css, with each url(*.svg) made into a data: URL. */
+.nytfix-banner, .nytfix-loading, #nytfix-status {
+  --nf-accent: #007a3d;
+  --nf-text: #141414;
+  --nf-muted: #5e605c;
+  --nf-line: #d9d5c9;
+  --nf-surface-2: #f7f5ef;
+  --nf-error: #ce1126;
+  --nf-error-soft: #fdf1f2;
+  --nf-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --nf-mark: url(icon-16.svg);
+  --nf-bar-bg: #141414;
+  --nf-bar-text: #f2f1ec;
+  --nf-bar-muted: #a3a49e;
+  --nf-bar-track: rgba(242, 241, 236, 0.18);
+  --nf-bar-fill: #3fbf7a;
+  --nf-bar-done: #3fbf7a;
+  --nf-bar-info: #a3a49e;
+  --nf-bar-error: #ff5a6a;
+  --nf-bar-link: #8fd9ae;
+  --nf-bar-link-hover: #b8ebcc;
+  --nf-bar-give-bg: #e0293c;
+  --nf-bar-give-text: #ffffff;
+  --nf-bar-band: url(keffiyeh-edge.svg);
+  --nf-bar-band-height: 8px;
+  --nf-bar-band-color: rgba(242, 241, 236, 0.5);
+}

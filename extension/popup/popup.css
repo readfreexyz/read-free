@@ -1,0 +1,62 @@
+body { width: 300px; }
+body > :not(.nf-band) { padding-left: 16px; padding-right: 16px; }
+
+header.nf-brand { position: relative; padding-top: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--nf-line); }
+header.nf-brand > * { position: relative; }
+header.nf-brand::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--nf-texture-color);
+  -webkit-mask: var(--nf-texture) 0 0 / 12px 12px repeat;
+  mask: var(--nf-texture) 0 0 / 12px 12px repeat;
+  opacity: 0.6;
+}
+
+/* A newer version is out (src/release.js) */
+.newer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--nf-line); background: var(--nf-accent-soft); color: var(--nf-text); font-size: 12.5px; font-weight: 600; text-decoration: none; }
+.newer[hidden] { display: none; }
+.newer-go { flex: none; color: var(--nf-accent); }
+.newer:hover .newer-go { text-decoration: underline; text-underline-offset: 2px; }
+
+.page { padding-top: 14px; padding-bottom: 14px; }
+.site { display: flex; flex-direction: column; min-width: 0; }
+.site-name { overflow: hidden; font-size: 15px; font-weight: 650; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.site-host { font-size: 12px; }
+.site-host:empty { display: none; }
+.state { display: flex; align-items: baseline; gap: 8px; margin: 8px 0 0; }
+.state .nf-dot { position: relative; top: -1px; }
+#action { width: 100%; margin-top: 12px; }
+
+/* Why this outlet is boycotted: always here, whatever the page */
+.why { padding-top: 12px; padding-bottom: 13px; border-top: 1px solid var(--nf-line); font-size: 12.5px; line-height: 1.45; }
+.why-head { margin: 0 0 3px; color: var(--nf-muted); font-size: 11px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; }
+.why-text { margin: 0; }
+
+/* The reader's tally: this month's cost leads */
+.tally { padding-top: 12px; padding-bottom: 14px; border-top: 1px solid var(--nf-line); }
+.tally p { margin: 0; }
+.tally-head { color: var(--nf-accent); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.tally-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tally-value { font-size: 44px; font-weight: 750; line-height: 1.1; letter-spacing: -0.035em; }
+.tally-counts { display: flex; flex-direction: column; gap: 2px; margin: 0; text-align: right; }
+.tally-counts div { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
+.tally-counts dd { margin: 0; font-size: 17px; font-weight: 700; }
+.tally-counts dt { color: var(--nf-muted); font-size: 12px; }
+.tally-note { color: var(--nf-muted); font-size: 12px; }
+.tally-aid { display: flex; justify-content: center; width: 100%; margin-top: 12px; text-decoration: none; }
+.tally-aid:hover { color: var(--nf-on-accent); }
+.tally-project { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; color: var(--nf-support-text); font-size: 12px; font-weight: 600; white-space: nowrap; text-decoration: none; }
+.tally-project:hover { color: var(--nf-support-text); text-decoration: underline; text-underline-offset: 2px; }
+.tally-since { margin-top: 8px !important; padding-top: 8px; border-top: 1px dashed var(--nf-line); color: var(--nf-muted); font-size: 12px; }
+
+.switches { padding-top: 4px; padding-bottom: 4px; border-top: 1px solid var(--nf-line); background: var(--nf-surface-2); }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; cursor: pointer; }
+.switch-row:not([hidden]) + .switch-row { border-top: 1px solid var(--nf-line); }
+.switch-row:has(.nf-switch:disabled) { cursor: default; }
+.switch-row:has(.nf-switch:disabled) .switch-label { color: var(--nf-muted); }
+
+footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; padding-bottom: 12px; border-top: 1px solid var(--nf-line); font-size: 13px; }
+.donate { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--nf-support-bg); color: var(--nf-support-text); font-weight: 600; text-decoration: none; }
+.donate:hover { color: var(--nf-support-text); text-decoration: underline; text-underline-offset: 2px; }
+.donate-icon { width: 14px; height: 14px; background: var(--nf-donate-icon) center / contain no-repeat; }

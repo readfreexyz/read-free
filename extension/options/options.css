@@ -1,0 +1,111 @@
+body { background: var(--nf-surface-2); }
+
+/* The heading: the mark, the name, and the theme's texture behind them (the keffiyeh's fishnet) */
+.top { position: relative; border-bottom: 1px solid var(--nf-line); background: var(--nf-surface); }
+.top::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--nf-texture-color);
+  -webkit-mask: var(--nf-texture) 0 0 / 14px 14px repeat;
+  mask: var(--nf-texture) 0 0 / 14px 14px repeat;
+  pointer-events: none;
+}
+.top-inner { position: relative; display: flex; align-items: center; gap: 14px; max-width: 680px; margin: 0 auto; padding: 22px 20px; }
+.logo { width: 44px; height: 44px; }
+.title { min-width: 0; }
+h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.015em; }
+.tagline { margin: 2px 0 0; color: var(--nf-muted); }
+.top .nf-version { margin-left: auto; align-self: flex-start; color: var(--nf-muted); font-size: 12px; }
+
+main { max-width: 680px; margin: 0 auto; padding: 20px 20px 40px; }
+.card { margin: 0 0 16px; padding: 18px 20px; border: 1px solid var(--nf-line); border-radius: 12px; background: var(--nf-surface); }
+h2 { margin: 0 0 4px; font-size: 15px; font-weight: 650; }
+h2 label { cursor: default; }
+h2 .count { margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--nf-surface-2); color: var(--nf-muted); font-size: 12px; font-weight: 600; vertical-align: 1px; }
+.hint { margin: 0 0 12px; color: var(--nf-muted); }
+.row { display: flex; align-items: center; gap: 12px; }
+select { min-height: 32px; padding: 5px 10px; border: 1px solid var(--nf-line); border-radius: var(--nf-radius); background: var(--nf-surface); color: inherit; font: inherit; }
+.saved { color: var(--nf-ok); font-weight: 600; }
+
+/* Notifications */
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 0 12px; border-top: 1px solid var(--nf-line); border-bottom: 1px solid var(--nf-line); cursor: pointer; }
+
+/* Sites */
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.all-sites { display: flex; flex: none; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 999px; background: var(--nf-surface-2); font-weight: 600; cursor: pointer; }
+.sites { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 20px; margin: 4px 0 0; padding: 0; list-style: none; }
+.sites li { border-top: 1px solid var(--nf-line); }
+.sites label { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; cursor: pointer; }
+.sites .name { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.sites .host { color: var(--nf-muted); font-size: 12px; }
+.sites.all-off .name { color: var(--nf-muted); }
+.sites label:has(.nf-switch:disabled) { cursor: default; }
+
+/* Your boycott: the reader's tally. One number leads (what this month's reading would have
+   cost), then the counts, then each outlet with a bar for its cost. */
+.headline { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24px; margin: 14px 0 22px; }
+.hero p { margin: 0; }
+.hero-eyebrow { color: var(--nf-accent); font-size: 13px; font-weight: 700; letter-spacing: 0.01em; }
+.hero-value { font-size: 64px; font-weight: 750; line-height: 1; letter-spacing: -0.035em; margin: 4px 0 6px !important; }
+.hero-note { color: var(--nf-muted); font-size: 14px; }
+.stats { display: flex; gap: 0; margin: 0 0 4px; }
+.stat { margin: 0; padding: 0 18px; border-left: 1px solid var(--nf-line); }
+.stat:first-child { padding-left: 0; border-left: 0; }
+.stat dt { color: var(--nf-muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.stat dd { margin: 2px 0 0; font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+.stat .detail { display: block; color: var(--nf-muted); font-size: 12px; font-weight: 400; letter-spacing: 0; }
+/* What to do with it: UNRWA first, the project second */
+.give { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0 0 22px; }
+.give .nf-button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 999px; font-size: 14px; text-decoration: none; }
+.give-aid { border-color: var(--nf-accent); background: var(--nf-accent); color: var(--nf-on-accent); }
+.give-aid:hover { border-color: var(--nf-accent-hover); background: var(--nf-accent-hover); color: var(--nf-on-accent); }
+.give-project { border-color: transparent; background: var(--nf-support-bg); color: var(--nf-support-text); }
+.give-project:hover { border-color: transparent; background: var(--nf-support-bg); color: var(--nf-support-text); text-decoration: underline; text-underline-offset: 2px; }
+.give-icon { width: 16px; height: 16px; background: var(--nf-donate-icon) center / contain no-repeat; }
+.give-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.give-note { margin: 0; color: var(--nf-muted); font-size: 12px; line-height: 1.35; }
+.outlets-head { margin: 0 0 4px; color: var(--nf-muted); font-size: 11px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; }
+.outlets { margin: 0 0 14px; padding: 0; list-style: none; }
+.outlets li { display: grid; grid-template-columns: minmax(120px, 180px) 1fr 70px 104px; align-items: center; gap: 14px; padding: 9px 0; border-top: 1px solid var(--nf-line); }
+.outlets .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.outlets .bar { height: 10px; border-radius: 5px; background: var(--nf-accent-soft); }
+.outlets .bar.empty { background: none; }
+.outlets .fill { display: block; height: 100%; border-radius: 5px; background: var(--nf-accent); }
+.outlets .read { color: var(--nf-muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.outlets .cost { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.outlets .cost strong { font-size: 17px; font-weight: 750; }
+.outlets .cost .per { color: var(--nf-muted); font-size: 12px; }
+.outlets .cost.none { color: var(--nf-muted); font-size: 12px; white-space: normal; line-height: 1.2; }
+.outlets .source { margin-left: 5px; color: var(--nf-muted); font-size: 12px; text-decoration: none; }
+.outlets .source:hover { color: var(--nf-accent); }
+@media (max-width: 600px) {
+  .headline { grid-template-columns: 1fr; gap: 16px; }
+  .outlets li { grid-template-columns: 1fr auto; row-gap: 6px; }
+  .outlets .bar { grid-column: 1 / -1; grid-row: 2; }
+  .outlets .read { display: none; }
+}
+.tally-how { margin: 0; font-size: 12.5px; }
+
+/* Support */
+.support { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; overflow: hidden; border-color: transparent; background: var(--nf-support-bg); }
+/* The theme's texture, woven faintly in the support colour */
+.support::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--nf-support-text);
+  opacity: 0.07;
+  -webkit-mask: var(--nf-texture) 0 0 / 14px 14px repeat;
+  mask: var(--nf-texture) 0 0 / 14px 14px repeat;
+  pointer-events: none;
+}
+.support > * { position: relative; }
+.support .hint { margin: 0; color: var(--nf-text); opacity: 0.75; }
+.support > div { flex: 1; }
+.support-icon { flex: none; width: 36px; height: 36px; background: var(--nf-donate-icon) center / contain no-repeat; }
+.support .nf-button { text-decoration: none; }
+.support-button { border-color: var(--nf-support-text); background: var(--nf-support-text); color: var(--nf-surface); }
+.support-button:hover { border-color: var(--nf-support-text); background: var(--nf-support-text); filter: brightness(1.08); }
+/* "I've donated": the donation link stops coming up in the status bar */
+.donated { display: flex; flex: 1 0 100%; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--nf-support-text) 20%, transparent); cursor: pointer; }

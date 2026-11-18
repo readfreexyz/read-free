@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <!-- icon.svg simplified for 16 px: no pith, three seeds (one above two, so they never read as a face). -->
+  <path d="M8.00 -1.20L-1.51 12.89A17 17 0 0 0 17.51 12.89Z" fill="#7d8288"/>
+  <path d="M8.00 -1.20L-0.39 11.24A15 15 0 0 0 16.39 11.24Z" fill="#b9bdc2"/>
+  <g fill="#5f6368">
+    <rect x="7.4" y="5.5" width="1.2" height="2.2" rx=".6"/>
+    <rect x="5.2" y="9" width="1.2" height="2.2" rx=".6"/>
+    <rect x="9.6" y="9" width="1.2" height="2.2" rx=".6"/>
+  </g>
+</svg>

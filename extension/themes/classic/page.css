@@ -1,0 +1,30 @@
+/* On news pages (theme "classic"): the banner, the loading box where the cut-off text ends, and
+   the floating status bar (its host element; the colors reach into its shadow root). Scoped to
+   those elements, never the page's :root, and the same in light and dark: it's the site's page.
+   tools/theme.mjs copies this into content.css, with each url(*.svg) made into a data: URL. */
+.nytfix-banner, .nytfix-loading, #nytfix-status {
+  --nf-accent: #23507d;
+  --nf-text: #1c2026;
+  --nf-muted: #5c6570;
+  --nf-line: #d4d9df;
+  --nf-surface-2: #f4f7fa;
+  --nf-error: #b3261e;
+  --nf-error-soft: #fdf3f2;
+  --nf-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --nf-mark: url(icon-16.svg);
+  --nf-bar-bg: #121212;
+  --nf-bar-text: #ffffff;
+  --nf-bar-muted: #a3a3a3;
+  --nf-bar-track: rgba(255, 255, 255, 0.18);
+  --nf-bar-fill: #5aa0e6;
+  --nf-bar-done: #4caf7a;
+  --nf-bar-info: #9e9e9e;
+  --nf-bar-error: #e5534b;
+  --nf-bar-link: #9ec5f0;
+  --nf-bar-link-hover: #c4dcf6;
+  --nf-bar-give-bg: #5aa0e6;
+  --nf-bar-give-text: #0f1b27;
+  --nf-bar-band: none;
+  --nf-bar-band-height: 0px;
+  --nf-bar-band-color: transparent;
+}

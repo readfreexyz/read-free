@@ -1,0 +1,50 @@
+/* Theme "classic": the first redesign (ink blue, a news page with its corner peeled back), kept
+   as a fallback. node tools/theme.mjs classic makes it the extension's look.
+   The extension's own pages (toolbar menu, settings) take these colors from ui/theme.css, a copy
+   of this file; URLs are relative to ui/. */
+:root {
+  color-scheme: light dark;
+  --nf-accent: #23507d;
+  --nf-accent-hover: #1b4066;
+  --nf-accent-soft: #e7eef6;
+  --nf-on-accent: #ffffff;
+  --nf-text: #1c2026;
+  --nf-muted: #5c6570;
+  --nf-line: #dde2e8;
+  --nf-surface: #ffffff;
+  --nf-surface-2: #f3f5f8;
+  --nf-ok: #2e7d4f;
+  --nf-working: #3d7cc0;
+  --nf-warn: #a15c00;
+  --nf-error: #b3261e;
+  --nf-off: #8b929b;
+  --nf-radius: 8px;
+  --nf-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Decoration: none in this theme */
+  --nf-band: none;
+  --nf-band-height: 0px;
+  --nf-band-color: transparent;
+  --nf-texture: none;
+  --nf-texture-color: transparent;
+  --nf-donate-icon: url(../themes/classic/heart.svg);
+  --nf-support-bg: var(--nf-accent-soft);
+  --nf-support-text: var(--nf-accent);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nf-accent: #8db8e4;
+    --nf-accent-hover: #a9caec;
+    --nf-accent-soft: #1f2d3b;
+    --nf-on-accent: #0f1b27;
+    --nf-text: #e6e9ed;
+    --nf-muted: #9aa3ad;
+    --nf-line: #333a42;
+    --nf-surface: #1b1f24;
+    --nf-surface-2: #242a31;
+    --nf-ok: #6cc28f;
+    --nf-working: #7fb0e6;
+    --nf-warn: #e0a84a;
+    --nf-error: #f08a80;
+    --nf-off: #6b727b;
+  }
+}

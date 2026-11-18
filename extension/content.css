@@ -1,0 +1,185 @@
+/* The extension's own elements on news pages take their colors from this block (the active
+   theme's page.css; switch themes with tools/theme.mjs). */
+/* theme:start (tools/theme.mjs writes this block from themes/solidarity/page.css) */
+/* On news pages (theme "solidarity"): the banner, the loading box where the cut-off text ends, and
+   the floating status bar (its host element; the colors reach into its shadow root). Scoped to
+   those elements, never the page's :root, and the same in light and dark: it's the site's page.
+   tools/theme.mjs copies this into content.css, with each url(*.svg) made into a data: URL. */
+.nytfix-banner, .nytfix-loading, #nytfix-status {
+  --nf-accent: #007a3d;
+  --nf-text: #141414;
+  --nf-muted: #5e605c;
+  --nf-line: #d9d5c9;
+  --nf-surface-2: #f7f5ef;
+  --nf-error: #ce1126;
+  --nf-error-soft: #fdf1f2;
+  --nf-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --nf-mark: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%20%3Cpath%20d%3D%22M8.00%20-1.20L-1.51%2012.89A17%2017%200%200%200%2017.51%2012.89Z%22%20fill%3D%22%230b6b34%22%2F%3E%20%3Cpath%20d%3D%22M8.00%20-1.20L-0.39%2011.24A15%2015%200%200%200%2016.39%2011.24Z%22%20fill%3D%22%23d6283a%22%2F%3E%20%3Cg%20fill%3D%22%23141414%22%3E%20%3Crect%20x%3D%227.4%22%20y%3D%225.5%22%20width%3D%221.2%22%20height%3D%222.2%22%20rx%3D%22.6%22%2F%3E%20%3Crect%20x%3D%225.2%22%20y%3D%229%22%20width%3D%221.2%22%20height%3D%222.2%22%20rx%3D%22.6%22%2F%3E%20%3Crect%20x%3D%229.6%22%20y%3D%229%22%20width%3D%221.2%22%20height%3D%222.2%22%20rx%3D%22.6%22%2F%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E");
+  --nf-bar-bg: #141414;
+  --nf-bar-text: #f2f1ec;
+  --nf-bar-muted: #a3a49e;
+  --nf-bar-track: rgba(242, 241, 236, 0.18);
+  --nf-bar-fill: #3fbf7a;
+  --nf-bar-done: #3fbf7a;
+  --nf-bar-info: #a3a49e;
+  --nf-bar-error: #ff5a6a;
+  --nf-bar-link: #8fd9ae;
+  --nf-bar-link-hover: #b8ebcc;
+  --nf-bar-give-bg: #e0293c;
+  --nf-bar-give-text: #ffffff;
+  --nf-bar-band: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2018%2016%22%20width%3D%2218%22%20height%3D%2216%22%3E%20%3Crect%20width%3D%2218%22%20height%3D%222%22%2F%3E%20%3Crect%20y%3D%223.2%22%20width%3D%2218%22%20height%3D%22.8%22%2F%3E%20%3Cpath%20transform%3D%22translate(1%2011.2)%20rotate(-32)%22%20d%3D%22M0%200C2.4-2.3%206.6-2.3%209%200C6.6%202.3%202.4%202.3%200%200Z%22%2F%3E%20%3Cpath%20transform%3D%22translate(10%204.8)%20rotate(32)%22%20d%3D%22M0%200C2.4-2.3%206.6-2.3%209%200C6.6%202.3%202.4%202.3%200%200Z%22%2F%3E%20%3Crect%20y%3D%2212%22%20width%3D%2218%22%20height%3D%22.8%22%2F%3E%20%3Crect%20y%3D%2214%22%20width%3D%2218%22%20height%3D%222%22%2F%3E%20%3C%2Fsvg%3E");
+  --nf-bar-band-height: 8px;
+  --nf-bar-band-color: rgba(242, 241, 236, 0.5);
+}
+/* theme:end */
+
+/* Status banner shown above the article body. */
+.nytfix-banner {
+  box-sizing: border-box;
+  position: relative;
+  max-width: 600px;
+  margin: 16px auto 24px;
+  padding: 10px 14px 10px 40px;
+  border: 1px solid var(--nf-line);
+  border-left: 4px solid var(--nf-accent);
+  border-radius: 6px;
+  background: var(--nf-surface-2);
+  color: var(--nf-text);
+  font: 14px/1.45 var(--nf-font);
+  text-align: left;
+}
+/* The theme's mark */
+.nytfix-banner::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  background: var(--nf-mark) center / contain no-repeat;
+}
+.nytfix-banner[data-kind="info"] { border-left-color: var(--nf-muted); }
+.nytfix-banner[data-kind="error"] { border-left-color: var(--nf-error); background: var(--nf-error-soft); }
+.nytfix-banner a,
+.nytfix-banner button {
+  margin-left: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nf-accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* Where the site's cut-off text ends, while archive.today loads the rest (in place of the site's
+   subscription line). Becomes a short note if archive.today can't help. */
+.nytfix-loading {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--nf-line);
+  border-radius: 6px;
+  background: var(--nf-surface-2);
+  color: var(--nf-muted);
+  font: 15px/1.4 var(--nf-font);
+  text-align: left;
+}
+.nytfix-loading:not([data-kind="loading"]) { border-style: solid; }
+.nytfix-loading[data-kind="error"] { border-color: var(--nf-error); background: var(--nf-error-soft); color: var(--nf-error); }
+/* Inside the article body the box sits in a row carrying the site's paragraph class, which sets
+   the column width; the row's own paragraph margins do the spacing. */
+.nytfix-loading-row > .nytfix-loading { margin: 8px 0; }
+.nytfix-loading-action {
+  flex: none;
+  margin: 0 0 0 auto;
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.nytfix-loading-action:hover { background: rgba(0, 0, 0, 0.05); }
+.nytfix-spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--nf-accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: nytfix-spin 0.8s linear infinite;
+}
+@keyframes nytfix-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .nytfix-spinner { animation: none; } }
+
+/* Original article nodes, hidden while the snapshot text is shown; also a wall's own elements
+   (an adapter's wall.hide, paywall services), hidden while the wall is lifted. The doubled
+   attribute and html/body make these rules more specific than a site's own !important ones
+   (LA Times: `.hidden { display: none !important }`). render.js also sets display and overflow
+   inline, which beats any stylesheet. */
+[data-nytfix-hidden],
+html body [data-nytfix-hidden][data-nytfix-hidden] { display: none !important; }
+
+/* Text a site sent but hid behind its wall (an adapter's wall.reveal): cut to a few lines,
+   faded out or blurred. "display" when it was display: none. */
+html body [data-nytfix-reveal][data-nytfix-reveal] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  filter: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  user-select: auto !important;
+  pointer-events: auto !important;
+}
+html body [data-nytfix-reveal="display"][data-nytfix-reveal="display"] { display: block !important; }
+/* A fade drawn over the hidden text in a pseudo-element (La Libre's preview: a white gradient in
+   its ::before). */
+html body [data-nytfix-reveal][data-nytfix-reveal]::before,
+html body [data-nytfix-reveal][data-nytfix-reveal]::after { background-image: none !important; }
+
+/* Scrolling, when a wall had locked it (overflow: hidden on <html> or <body>, or either pinned
+   in place). */
+html[data-nytfix-unlock][data-nytfix-unlock],
+html body[data-nytfix-unlock][data-nytfix-unlock] { overflow: visible !important; }
+html[data-nytfix-unlock="fixed"][data-nytfix-unlock="fixed"],
+html body[data-nytfix-unlock="fixed"][data-nytfix-unlock="fixed"] { position: static !important; top: auto !important; }
+
+/* The article body while it holds the archived text. A site's CSS for its cut-off text doesn't
+   apply to it: WSJ hides every paragraph in the body after the second
+   (`p:nth-of-type(n + 3) { display: none }`) and fades out the body's last lines with a white
+   gradient drawn in its ::after. */
+html body [data-nytfix-swapped] .nytfix-body p { display: block !important; }
+html body [data-nytfix-swapped][data-nytfix-swapped]::after { display: none !important; }
+/* National Post keeps its body invisible until its paywall script has decided. */
+html body [data-nytfix-swapped][data-nytfix-swapped] { visibility: visible !important; }
+
+/* Photos in the archived text. */
+.nytfix-figure { margin: 32px 0; }
+.nytfix-figure img { display: block; max-width: 100%; width: auto; height: auto; margin: 0 auto; } /* never stretched past its real size */
+.nytfix-figure figcaption {
+  margin-top: 8px;
+  color: #5a5a5a;
+  font: 14px/1.45 nyt-imperial, georgia, "times new roman", times, serif;
+}
+
+/* Used only when the live page has no paragraphs to copy styles from. */
+.nytfix-fallback { max-width: 600px; margin: 0 auto; padding: 0 20px; }
+.nytfix-fallback p {
+  margin: 0 0 15px;
+  font: 20px/30px nyt-imperial, georgia, "times new roman", times, serif;
+  color: #363636;
+}
+.nytfix-fallback h2 {
+  margin: 32px 0 12px;
+  font: 700 20px/26px nyt-franklin, helvetica, arial, sans-serif;
+}

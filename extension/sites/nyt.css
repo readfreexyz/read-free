@@ -1,0 +1,18 @@
+/* Keep NYT's walls from ever being drawn (docs/phase0-findings.md). Chrome puts an extension's
+   CSS in place before the page renders, so this beats the wall to the screen: the popup never
+   shows, and the page container is never pinned (which is what threw readers back to the top).
+   The core script handles what CSS can't: `inert`, and the gradient scrim if it has content.
+   When the reader asks for NYT's version, the extension adds .nytfix-off to bring the wall back. */
+html:not(.nytfix-off) #gateway-content,
+html:not(.nytfix-off) [data-testid="onsite-messaging-unit-gateway"],
+html:not(.nytfix-off) #gateway-exit-advisory,
+html:not(.nytfix-off) [data-testid="vi-gateway-container"] > div:empty {
+  display: none !important;
+}
+html:not(.nytfix-off) [data-testid="vi-gateway-container"] {
+  position: static !important;
+  inset: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
