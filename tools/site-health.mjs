@@ -6,8 +6,9 @@
 //
 //   node tools/site-health.mjs [--only id,id] [--samples 2] [--json out.json]
 //
-// Many sites refuse scripted requests from some networks, so expect skips here; the extension's
-// own check runs in Chrome. Exit code 1 if any check failed.
+// It says it's a script (Node's own user agent), never a browser. Some outlets refuse that (NYT,
+// FT, The Atlantic, WSJ and Reuters, as of November 2026), so expect skips there: look at those
+// in a browser. Exit code 1 if any check failed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -31,8 +32,8 @@ const health = require(path.join(root, 'extension/health/checks.js'));
 const specs = require(path.join(root, 'extension/health/specs.js'));
 const sites = globalThis.NYTFix.sites;
 
+// No user-agent of its own: Node's ("node") says it's a script, as it is. Never a browser's.
 const HEADERS = {
-  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'accept-language': 'en-US,en;q=0.9',
 };

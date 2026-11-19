@@ -13,8 +13,8 @@ the work, and it settles the order of the batches below.
   - how much article text the page sends
   - which paywall services load (Piano, Zephr, Sophi, Laterpay…)
 
-  When it was blocked (a bot check, or names your network's proxy wouldn't resolve), the page was
-  loaded in the user's Chrome instead, where Chrome's permission prompts allowed it.
+  When the script couldn't get a page (a bot check, or a site that didn't load), the page was
+  checked in a browser instead.
 - **archive.today:** `/newest/<url>` for 2 articles per outlet with a wall or an open question
   (55 lookups, 2.5 s apart, no CAPTCHA or rate limit). It recorded the paragraph count and
   characters in the newest snapshot, and the id / itemprop / role / name that holds them.
@@ -47,7 +47,7 @@ newest snapshots found for the 2 samples. "Marker" is what holds the text in a s
 
 | Outlet | Wall | Sent | Snapshots | Marker | Next |
 | --- | --- | --- | --- | --- | --- |
-| 9News | none expected | not checked (proxy wouldn't resolve; Bing's samples were years old) | — | — | free, confirm |
+| 9News | none expected | not checked (the site didn't load; Bing's samples were years old) | — | — | free, confirm |
 | ABC News (Australia) | none (marked free) | all | — | — | free |
 | ABC News (US) | none expected | not checked (samples were widgets) | — | — | free, confirm |
 | Associated Press | none (no flag, 20 paragraphs on the page) | all | — | — | free. Shows automated browsers a Cloudflare check. |
@@ -62,7 +62,7 @@ newest snapshots found for the 2 samples. "Marker" is what holds the text in a s
 | De Telegraaf | premium articles expected | not checked: Cloudflare's bot check, in the built-in browser and in Chrome through the tools | 2 of 2, but older captures | `div#__next` (the whole app) | batch 3: needs a page the user saves |
 | Der Spiegel | Spiegel+ articles (flag false on 1 of 3) | **cut** (515 characters) | 2 of 2, about 4k | `main#Inhalt` | **batch 2** |
 | Fox News | none (marked free) | all | — | — | free |
-| GB News | none expected | not checked (proxy) | — | — | free, confirm |
+| GB News | none expected | not checked (the site didn't load) | — | — | free, confirm |
 | ITV News | none expected | not checked (connection error) | — | — | free, confirm |
 | La Libre Belgique | premium articles (flag False on 1 of 3, Piano) | cut | **0 of 2** | — | parked |
 | Le Monde | subscriber articles (flag false, `.article__reserved-content`) | **cut** (~1.5k) | 1 of 2, ~8.3k | `section#habillagepub` (an ad wrapper; check) | **batch 2** |
@@ -82,7 +82,7 @@ newest snapshots found for the 2 samples. "Marker" is what holds the text in a s
 | The Age | paywall (flag false, `.paywall`, Piano) | **cut** (~5 paragraphs) | 1 of 2 (the other timed out), ~7.4k | `main#content` | **batch 2** (Nine, with SMH) |
 | The Australian | hard paywall expected | not checked (403) | **0 of 2** | — | parked |
 | The Daily Telegraph (Australia) | paywall expected | not checked (403) | 1 of 2, **cut** (~0.9k) | — | parked |
-| The Daily Telegraph (UK) | metered / premium expected | not checked (proxy; Chrome wanted approval) | 1 of 2, complete (~11k) | `main#main-content` | **batch 2** |
+| The Daily Telegraph (UK) | metered / premium expected | not checked (the site didn't load) | 1 of 2, complete (~11k) | `main#main-content` | **batch 2** |
 | The Economist | hard paywall (flag false, Zephr) | cut (4 paragraphs on the page) | **0 of 2** (newsletters; an earlier sample was an empty page) | — | parked: retry with regular articles |
 | The Free Press | paid posts (Substack, `audience: only_paid`) | **cut** on the server: 146 of 1,554 and 333 of 2,170 words | the preview only (445 of 2,170 words, the paid-subscriber box captured) | `div[role=main]` | **parked**: archive.today has previews |
 | The Globe and Mail | paywall (flag False, Zephr + Sophi) | **all** (~6.6k) | 2 of 2 | `article#content-gate` | **batch 1**, lift only |
@@ -210,7 +210,7 @@ their meters, and the Toronto Star in a browser.
     service was.
 
   So its markup is unknown. It most likely depends on the window (incognito) and what the
-  ad blocker or proxy lets through there.
+  ad blocker lets through there.
 - **Change:** `src/notices.js`, on every supported article page, wall or no wall. It finds a
   notice by what it says:
   - It looks at elements drawn on top: position fixed (children and grandchildren of `<body>`),
@@ -304,7 +304,7 @@ inside archive.ph in the user's Chrome. Only counts and structure were recorded.
 | The Sydney Morning Herald | Same as The Age (2 paragraphs, 75 words), same Piano slots and lock. | Same. | 31 and 8 paragraphs (two samples). A video player's labels were in one; video players (`[aria-label="Video Player"]`) and their labels are now skipped on every site. |
 | Der Spiegel | Spiegel+: none of the text. `div[data-area=body]` holds only the offer block `[data-area=paywall]`. Free articles: paragraphs without a class in `div[data-area=text] > div.RichText`. | The offer block. (A fresh profile also gets a consent prompt that locks `<body>`.) | 10 paragraphs (Spiegel+ sample), 9 (free sample). |
 | Le Monde | 4 paragraphs (`p.article__paragraph`) in `article.article__content`. The JSON-LD's `hasPart` names `.article__reserved-content`, which isn't on the page. | `section.paywall.js-paywall`. The cookie-consent wall (`.gdpr-lmd-wall`, pay-or-accept) is a separate choice and is left alone. | 16 paragraphs, 2 subheads, after dropping 4 "Read more" labels and the link-only titles after them. |
-| The Daily Telegraph | **Not built.** telegraph.co.uk doesn't load on the user's network (Chrome's error page; the shell and built-in browser couldn't resolve it). | — | 1 of 2 archived in the survey, complete (`main#main-content`). |
+| The Daily Telegraph | **Not built.** telegraph.co.uk didn't load when it was checked, so its pages couldn't be looked at. | — | 1 of 2 archived in the survey, complete (`main#main-content`). |
 
 New in the core along the way:
 
@@ -682,7 +682,7 @@ article per site. Structure and counts only. Nothing is built.
 | Le Parisien | subscriber articles: flag false, `hasPart .paywall-abo`; the script gets 403 | **cut** on the server (2 samples: 3 paragraphs, under 1k) | 1 of 1, same day, 32 blocks and 8.2k | archive.today swap candidate |
 | Bild | BILDplus | Bing samples free and whole (2.0–2.7k). One BILDplus-marked page: flag false, 1 paragraph, 767 characters, but it was a competition page, not an article | not checked | probably cut; needs real BILDplus samples |
 | The Jerusalem Post | none seen (flag true) | all (JSON-LD `articleBody` 2.2–3.6k matches the page) | — | free in these samples; premium section not sampled |
-| Die Zeit | Z+ expected | not checked: the script couldn't resolve the name, and the built-in browser got a 403 | — | needs the user's Chrome |
+| Die Zeit | Z+ expected | not checked: the site didn't load for the script, and the built-in browser got a 403 | — | needs the user's Chrome |
 | de Volkskrant | expected | not checked: 403 to the script, and the built-in browser wasn't allowed to open it | — | needs the user's Chrome |
 | AD | expected | not checked: 403 to the script; not tried in the browser (same publisher as de Volkskrant) | — | needs the user's Chrome |
 

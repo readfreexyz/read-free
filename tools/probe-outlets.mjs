@@ -17,15 +17,18 @@
 //
 // A first-time reader is under every meter, so a metered site sends the whole article here too.
 // What separates it from a free site is the JSON-LD flag and the paywall service.
+// It says it's a script (Node's own user agent). Some outlets refuse that (NYT, FT, The
+// Atlantic, WSJ and Reuters, as of November 2026): their bot check is recorded, and they're
+// looked at in a browser instead.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { JSDOM, VirtualConsole } = require('jsdom');
 
-const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
+// No user-agent of its own: Node's ("node") says it's a script, as it is. Never a browser's:
+// sites that refuse scripts are left unchecked here and looked at in a browser instead.
 const HEADERS = {
-  'user-agent': UA,
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'accept-language': 'en-US,en;q=0.9',
 };
