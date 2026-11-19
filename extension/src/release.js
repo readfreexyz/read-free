@@ -1,10 +1,17 @@
-// "Read Free 0.20.0 is out", in the toolbar menu, for those who loaded the folder by hand. Those
-// who installed with website/install.sh get new versions by themselves (docs/auto-update.md),
-// so it waits until a release is a day old: by then theirs has updated, and they never see it.
-// The menu reads latest.txt from the release addresses (settings.RELEASE_URLS) when it opens, at
-// most once a day: never from article pages or on a timer. Only the version and date are taken
-// from it; the link is the first release address, built in. Kept in chrome.storage.local:
-//   { version, date, checkedAt, retryAt }
+// "Read Free 0.20.0 is out", for those who loaded the folder by hand: in the toolbar menu, as an
+// arrow on the toolbar icon (background.js), and now and then in the status bar (notify.js).
+// Those who installed with website/install.sh get new versions by themselves
+// (docs/auto-update.md), so it waits until a release is a day old: by then theirs has updated,
+// and they never see it.
+// latest.txt is read from the release addresses (settings.RELEASE_URLS) at most once a day: by
+// the service worker (an alarm), or the menu when it opens. Never from article pages: they ask
+// the service worker what it knows. No cookies, no referrer, no query. Only the version and date
+// are taken from it; the link is the first release address's update steps (#update), built in.
+// It also waits until this copy has known of the version for two hours (seenAt): a computer
+// waking from sleep a day after a release learns of it at the same time as its hourly updater,
+// which then has time to install it first.
+// Kept in chrome.storage.local:
+//   { version, date, checkedAt, retryAt, seenAt }
 (function (root) {
   'use strict';
 
@@ -13,6 +20,7 @@
   const KEY = 'release';
   const HOUR = 60 * 60 * 1000;
   const DAY = 24 * HOUR;
+  const HOLD = 2 * HOUR; // known this long before it's said
   const LIMITS = Object.freeze({ bytes: 4096, timeoutMs: 4000 });
 
   // latest.txt (tools/release.sh): its version and date, or null.
@@ -52,7 +60,9 @@
         if (!latest) continue;
         // A version seen without a date counts from now
         const date = latest.date ?? (latest.version === record.version ? record.date : null) ?? now;
-        next = { version: latest.version, date, checkedAt: now, retryAt: 0 };
+        // When this copy first learned of this version (a record from before seenAt: its last check)
+        const seenAt = latest.version === record.version ? (record.seenAt || record.checkedAt || now) : now;
+        next = { version: latest.version, date, checkedAt: now, retryAt: 0, seenAt };
         break;
       } catch {
         // Unreachable or too slow: the next address
@@ -64,14 +74,16 @@
     return next;
   }
 
-  // What the menu says, or null: a version newer than the one running, out for a day.
+  // What the menu says, or null: a version newer than the one running, out for a day, and known
+  // here for two hours.
   function notice(record, running, { urls = settings.RELEASE_URLS, now = Date.now() } = {}) {
     if (!urls?.length || !record?.version || !updateLib.isNewer(record.version, running)) return null;
     if (!Number.isFinite(record.date) || now - record.date < DAY) return null;
-    return { version: record.version, href: urls[0], text: `Read Free ${record.version} is out` };
+    if (now - (record.seenAt || record.checkedAt || 0) < HOLD) return null;
+    return { version: record.version, href: `${urls[0]}#update`, text: `Read Free ${record.version} is out` };
   }
 
-  const release = { KEY, LIMITS, parse, load, refresh, notice };
+  const release = { KEY, LIMITS, HOLD, parse, load, refresh, notice };
   root.NYTFix = Object.assign(root.NYTFix || {}, { release });
   if (typeof module === 'object' && module.exports) module.exports = release;
 })(globalThis);

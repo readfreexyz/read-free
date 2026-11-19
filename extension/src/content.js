@@ -620,7 +620,7 @@
   // to say. paid: the wall was a paywall (not NYT's login wall), for the reader's tally.
   function announce(status, message, outcome, { paid = true } = {}) {
     const reason = reasonsLib.reasonFor(site.id);
-    const plan = notifyLib.plan(notifyState, { site: site.id, article: site.normalizeUrl(location.href), outcome, reason, tip: settingsLib.tipLink(), paid, explainedHere, alwaysConfirm: prefs?.alwaysConfirm, donated: prefs?.donated });
+    const plan = notifyLib.plan(notifyState, { site: site.id, article: site.normalizeUrl(location.href), outcome, reason, tip: settingsLib.tipLink(), paid, explainedHere, alwaysConfirm: prefs?.alwaysConfirm, donated: prefs?.donated, newer });
     remember(plan.next);
     if (!plan.show) {
       status?.remove();
@@ -657,6 +657,15 @@
   function remember(state) {
     notifyState = state;
     notifyLib.save(chrome.storage.local, state);
+  }
+
+  // A newer version out (for copies loaded by hand), from what the service worker already knows
+  // (src/release.js): nothing is fetched from here. Asked once, without holding the page up; if
+  // the answer hasn't come by the time a wall comes off, the status bar just doesn't mention it.
+  try {
+    Promise.resolve(chrome.runtime.sendMessage({ type: 'nytfix:newer' })).then(answer => { newer = answer?.version ? answer : null; }, () => {});
+  } catch {
+    // The extension was reloaded under this page: nothing to ask
   }
 
   // Start last, once everything above is defined and the settings are in: if a wall is already

@@ -238,9 +238,11 @@
     //            shown open (explain: true) or behind a "Why?" link
     //   donate   { text, href, open, onGive, onLater }: the donation link, with "Not now"; open,
     //            if given, is called instead of following href
-    // A bar with a reason or a donation link closes with its × only, so its links can be used;
-    // any other finished bar closes on a click anywhere.
-    function finish(kind, text, { link = null, reason = null, explain = false, donate = null, hideAfterMs = kind === 'error' ? 8000 : link ? 6000 : 3000 } = {}) {
+    //   newer    { text, button, href }: a newer version is out, with a link to how to update
+    //            (https only)
+    // A bar with a reason, a donation link or a newer version closes with its × only, so its
+    // links can be used; any other finished bar closes on a click anywhere.
+    function finish(kind, text, { link = null, reason = null, explain = false, donate = null, newer = null, hideAfterMs = kind === 'error' ? 8000 : link ? 6000 : 3000 } = {}) {
       finished = true;
       win.clearInterval(ticker);
       bar.classList.remove('pending');
@@ -248,7 +250,8 @@
       bar.dataset.kind = kind;
       label.textContent = text;
       if (link && /^https:\/\//i.test(link.href)) time.replaceWith(outLink('link', link.short || link.text, link.href));
-      const extras = Boolean(reason || donate || whyBlock);
+      const showNewer = Boolean(newer && /^https:\/\//i.test(newer.href));
+      const extras = Boolean(reason || donate || showNewer || whyBlock);
       if (reason && !whyBlock) {
         why(reason, { open: explain });
         if (!explain) {
@@ -277,6 +280,13 @@
         const later = a11yButton('later', 'Not now', () => { donate.onLater?.(); ask.hidden = true; });
         ask.append(words, give, later);
         track.before(ask);
+      }
+      if (showNewer) {
+        const note = el(doc, 'div', 'ask newer');
+        const words = el(doc, 'p', 'ask-text');
+        words.textContent = newer.text;
+        note.append(words, outLink('link', `${newer.button || 'How to update'} ↗`, newer.href));
+        track.before(note);
       }
       if (extras) {
         bar.dataset.extras = '';

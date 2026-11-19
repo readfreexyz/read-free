@@ -69,7 +69,8 @@ async function waitFor(check, timeout = 3000) {
 // after the redirect), or 404 when the timemap has none. Fetching through /newest/ records only
 // the /newest/ URL in `fetched`.
 // storage: chrome.storage.local (saved articles); sync: chrome.storage.sync (settings).
-function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = memoryArea(), sync = memoryArea(), scripts = scriptsFor(url) } = {}) {
+// newer: what the service worker says when asked for a newer version (release.notice()), or null.
+function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = memoryArea(), sync = memoryArea(), scripts = scriptsFor(url), newer = null } = {}) {
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', e => { if (!/Not implemented: (window\.scroll|Window's scroll)/.test(e.message)) console.error(e); });
   const logs = [];
@@ -88,6 +89,7 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
           marks.push(msg.state);
           return undefined;
         }
+        if (msg.type === 'nytfix:newer') return newer;
         fetched.push(msg.url);
         return answer(msg.url);
       },
@@ -519,6 +521,25 @@ test('toolbar: undo puts the paywall back, a second click swaps again from the c
     await waitFor(page.body);
     assert.equal(page.fetched.length, 1, 'the second swap came from the cache');
     assert.equal(page.mark(), 'swapped');
+  } finally {
+    page.close();
+  }
+});
+
+test('a newer version out: the status bar says so once the wall is off, with how to update', async () => {
+  // A regular reader (NYT explained two days ago): nothing else to say, so this is what shows
+  const now = Date.now();
+  const days = [1, 2, 3, 4].map(n => new Date(now - n * 86400000).toISOString().slice(0, 10));
+  const storage = memoryArea({ notify: { v: 1, fixed: 30, days, sites: { nyt: now - 2 * 86400000 } } });
+  const newer = { version: '0.22.0', href: 'https://readfree.xyz/#update', text: 'Read Free 0.22.0 is out' };
+  const page = boot({ html: livePageHtml({ wall: 'login' }), storage, newer });
+  try {
+    const note = await waitFor(() => page.doc.getElementById('nytfix-status')?.shadowRoot.querySelector('.newer'));
+    assert.match(note.querySelector('.ask-text').textContent, /^Read Free 0\.22\.0 is out\./);
+    assert.equal(note.querySelector('a').href, 'https://readfree.xyz/#update');
+    assert.equal(page.doc.getElementById('nytfix-status').shadowRoot.querySelector('.ask:not(.newer)'), null, 'no donation link with it');
+    assert.deepEqual(page.fetched, [], 'nothing fetched for it');
+    assert.equal(storage.data.notify.update.lastAt > 0, true, 'remembered, so it waits three days');
   } finally {
     page.close();
   }

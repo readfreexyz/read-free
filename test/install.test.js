@@ -158,10 +158,16 @@ test('install, update, and refusing every bad release', { skip }, async t => {
     const res = sh('install', '--no-schedule');
     assert.equal(res.status, 0, res.stdout + res.stderr);
     assert.equal(installed(), '1.0.0');
-    assert.equal(fs.readFileSync(path.join(base, 'update.sh'), 'utf8'), fs.readFileSync(script, 'utf8'));
+    // The kept copy: on macOS its name is what Login Items lists the LaunchAgent as, so the
+    // LaunchAgent runs it directly (executable), not through /bin/sh
+    const self = path.join(base, process.platform === 'darwin' ? 'Read Free updater' : 'update.sh');
+    assert.equal(fs.readFileSync(self, 'utf8'), fs.readFileSync(script, 'utf8'));
+    assert.ok(fs.statSync(self).mode & 0o100, 'the kept copy is executable');
+    const plist = fs.readFileSync(INSTALLER, 'utf8').match(/<key>ProgramArguments<\/key>\s*<array>\s*<string>([^<]*)<\/string>/);
+    assert.equal(plist?.[1], '$(xml "$SELF")', 'the LaunchAgent runs the kept copy itself');
     assert.match(res.stdout, /Load unpacked/);
     // Afterwards: the installed copy, for status and uninstall; the copy that was run can go
-    assert.ok(res.stdout.includes(`sh '${path.join(base, 'update.sh')}' uninstall`), `how to stop the updates:\n${res.stdout}`);
+    assert.ok(res.stdout.includes(`sh '${self}' uninstall`), `how to stop the updates:\n${res.stdout}`);
     assert.ok(res.stdout.includes(`You can delete ${script}: Read Free keeps its own copy`), 'the copy that was run can go');
     assert.deepEqual(leftovers(), []);
     const again = sh('update');

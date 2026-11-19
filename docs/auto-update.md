@@ -2,7 +2,7 @@
 
 Sites change, so the extension needs updates. The Chrome Web Store doesn't allow extensions that take off paywalls, and Chrome on a Mac only installs a self-hosted `.crx` under an enterprise policy. So Read Free is loaded unpacked, and the folder Chrome loads is kept up to date from outside Chrome. Two ways:
 
-- **Readers:** signed releases, installed and updated by `website/install.sh` (macOS and Linux). Those who load a folder by hand instead are told in the toolbar menu when a new version is out.
+- **Readers:** signed releases, installed and updated by `website/install.sh` (macOS and Linux). Those who load a folder by hand instead are told when a new version is out: in the toolbar menu, by an arrow on its icon, and now and then in the status bar ([The update notice](#the-update-notice)).
 - **The maintainer's Mac:** a git clone that a LaunchAgent pulls every hour (below, from [The release clone](#the-release-clone)).
 
 Either way, the extension notices the newer version on disk and reloads itself (`extension/src/update.js`, [below](#the-extension-reloads-itself)).
@@ -24,13 +24,13 @@ A release is these files, uploaded to the site and to each mirror (`RELEASE_URLS
 curl -fsSLO https://readfree.xyz/install.sh && sh install.sh
 ```
 
-It downloads the newest release, checks it, unpacks it into `~/Library/Application Support/Read Free/extension` (Linux: `~/.local/share/read-free/extension`), keeps a copy of itself next to it as `update.sh`, and schedules `update.sh update` every hour: a LaunchAgent (`local.readfree.update`) on macOS, a crontab line on Linux. Then, once, in Chrome: Developer mode on, **Load unpacked**, that folder. Developer mode must stay on (see [The extension reloads itself](#the-extension-reloads-itself)).
+It downloads the newest release, checks it, unpacks it into `~/Library/Application Support/Read Free/extension` (Linux: `~/.local/share/read-free/extension`), keeps a copy of itself next to it (`Read Free updater` on macOS, `update.sh` on Linux), and schedules that copy's `update` every hour: a LaunchAgent (`local.readfree.update`) on macOS, which runs the copy itself (it's executable), and a crontab line on Linux. Then, once, in Chrome: Developer mode on, **Load unpacked**, that folder. Developer mode must stay on (see [The extension reloads itself](#the-extension-reloads-itself)).
 
-`sh install.sh status` shows the folder, the version and the log; `sh install.sh uninstall` stops the updates. `install --no-schedule` installs without them. At the end it prints those two commands with the installed copy (`update.sh`), and says the `install.sh` that was run can be deleted. On macOS it also says that macOS may announce a new background item: System Settings lists the LaunchAgent under Login Items as `sh`, the program it runs.
+`sh install.sh status` shows the folder, the version and the log; `sh install.sh uninstall` stops the updates. `install --no-schedule` installs without them. At the end it prints those two commands with the installed copy, and says the `install.sh` that was run can be deleted. On macOS it also says that macOS may announce a new background item: System Settings lists a LaunchAgent under Login Items by the file name of the program it runs, so it shows as **Read Free updater** (with no developer: that would take an Apple-signed program). A copy installed by an earlier script, `update.sh` run through `/bin/sh`, showed as `sh`; installing again replaces it.
 
 ### What an update checks
 
-Each hour, `update.sh` asks the addresses in turn, moving on when one doesn't answer or answers with something that doesn't check out. The first signed release decides. What went wrong with an address is logged only if the run ends in an update or a failure, so a mirror that's down isn't news every hour. It installs a release only if:
+Each hour, the installed copy asks the addresses in turn, moving on when one doesn't answer or answers with something that doesn't check out. The first signed release decides. What went wrong with an address is logged only if the run ends in an update or a failure, so a mirror that's down isn't news every hour. It installs a release only if:
 
 1. `latest.txt` came over https (redirects included), and is at most 4 KB;
 2. its signature checks out, by exit status, against the key in the script, for the `read-free-release` namespace. Nothing in it is read before that;
@@ -43,9 +43,15 @@ Then it moves the installed folder aside and the new one in (renames within the 
 
 The hourly job runs the installed copy of the script, never a fresh download: a site or mirror in the wrong hands can't put code in anyone's browser without the key. It can only withhold updates, or serve an older signed release, which isn't installed. It could give a new install a different `install.sh`: install from the site you trust. Running a newer `install.sh` by hand replaces the installed copy, which is how the script itself is updated.
 
-### The menu's notice
+### The update notice
 
-For those who load a folder by hand (`extension/src/release.js`): when the toolbar menu opens, at most once a day (an hour after a failed try), it reads `latest.txt` from the first address that answers. If the version is newer than the one running and the release is a day old, the menu says "Read Free <version> is out" and links to the first address. A day, so those who installed with the script, updated within the hour, never see it. Only the version and date are taken from the file, and the link is built in. The request carries no cookies, referrer or query; it's never made from article pages or on a timer. The host must send `Access-Control-Allow-Origin: *`: GitHub Pages does, and Cloudflare does because of `website/_headers`.
+For those who load a folder by hand (`extension/src/release.js`). Once a day the service worker reads `latest.txt` from the first address that answers (an hourly alarm wakes it; it asks again an hour after a failed try, otherwise a day after the last answer). The toolbar menu does the same when it opens, if a day has passed. If the version is newer than the one running, the release is a day old, and this copy has known of it for two hours (a computer waking from sleep learns of a release at the same time as its hourly updater, which then installs it first):
+
+- the menu says "Read Free <version> is out", with **Get it**;
+- the toolbar icon carries a red ↑ on every tab without a ✓ of its own, and its tooltip says so;
+- once a wall comes off, the status bar says "Read Free <version> is out. Updating keeps it working as the outlets change their walls.", with **How to update**, at most every three days, never with an outlet's reason, and in place of the donation link (`extension/src/notify.js`). Article pages ask the service worker what it knows: nothing is fetched from them.
+
+The links go to the first address's update steps (`#update`, the front page's manual-update card). A day, so those who installed with the script, updated within the hour, never see any of it. Only the version and date are taken from the file, and the link is built in. The request carries no cookies, referrer or query. The host must send `Access-Control-Allow-Origin: *`: GitHub Pages does, and Cloudflare does because of `website/_headers`.
 
 ### Setting it up, once
 

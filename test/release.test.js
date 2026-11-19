@@ -32,13 +32,16 @@ test('refresh: at most once a day, the first address that answers, kept', async 
   assert.deepEqual(asked.map(a => a[0]), ['https://readfree.example/latest.txt', 'https://mirror.example/rf/latest.txt']);
   assert.equal(asked[0][1].credentials, 'omit');
   assert.equal(asked[0][1].referrerPolicy, 'no-referrer');
-  assert.deepEqual(record, { version: '0.20.0', date: Date.UTC(2026, 10, 16, 9), checkedAt: NOW, retryAt: 0 });
+  assert.deepEqual(record, { version: '0.20.0', date: Date.UTC(2026, 10, 16, 9), checkedAt: NOW, retryAt: 0, seenAt: NOW });
   assert.deepEqual(area.data.release, record);
   // Within the day: no request
   await release.refresh(area, URLS, { fetch: async () => assert.fail('asked again'), now: NOW + DAY - 1 });
   // A day on: asked again
-  await release.refresh(area, URLS, { fetch: async () => reply(latest('0.21.0')), now: NOW + DAY });
+  await release.refresh(area, URLS, { fetch: async () => reply(latest('0.20.0')), now: NOW + DAY });
+  assert.equal(area.data.release.seenAt, NOW, 'the same version: first seen when it first was');
+  await release.refresh(area, URLS, { fetch: async () => reply(latest('0.21.0')), now: NOW + 2 * DAY });
   assert.equal(area.data.release.version, '0.21.0');
+  assert.equal(area.data.release.seenAt, NOW + 2 * DAY, 'a new version: seen now');
 });
 
 test('refresh: nothing answers, so try again in an hour, keeping what was known', async () => {
@@ -63,11 +66,16 @@ test('refresh: a release without a date counts from when it was first seen', asy
 
 test('notice: a newer version, a day old, linking to the first address', () => {
   const record = { version: '0.20.0', date: NOW - DAY };
-  assert.deepEqual(release.notice(record, '0.19.0', { urls: URLS, now: NOW }), { version: '0.20.0', href: 'https://readfree.example/', text: 'Read Free 0.20.0 is out' });
+  assert.deepEqual(release.notice(record, '0.19.0', { urls: URLS, now: NOW }), { version: '0.20.0', href: 'https://readfree.example/#update', text: 'Read Free 0.20.0 is out' });
   assert.equal(release.notice(record, '0.20.0', { urls: URLS, now: NOW }), null, 'the same');
   assert.equal(release.notice(record, '0.20.1', { urls: URLS, now: NOW }), null, 'older');
   assert.equal(release.notice({ version: '0.19.10', date: NOW - DAY }, '0.19.9', { urls: URLS, now: NOW })?.version, '0.19.10', 'numerically');
   assert.equal(release.notice({ ...record, date: NOW - DAY + 1 }, '0.19.0', { urls: URLS, now: NOW }), null, 'not a day old: those with the script have it by then');
   assert.equal(release.notice(record, '0.19.0', { urls: [], now: NOW }), null, 'no addresses');
   assert.equal(release.notice({}, '0.19.0', { urls: URLS, now: NOW }), null);
+  // Known here for two hours first: a computer waking from sleep a day after a release learns of
+  // it with its hourly updater, which installs it in the meantime
+  assert.equal(release.notice({ ...record, seenAt: NOW - release.HOLD + 1 }, '0.19.0', { urls: URLS, now: NOW }), null, 'just learned of it');
+  assert.equal(release.notice({ ...record, seenAt: NOW - release.HOLD }, '0.19.0', { urls: URLS, now: NOW })?.version, '0.20.0', 'two hours on');
+  assert.equal(release.notice({ ...record, checkedAt: NOW - 60000 }, '0.19.0', { urls: URLS, now: NOW }), null, 'a record from before seenAt: its last check');
 });

@@ -68,6 +68,31 @@ test("quiet once there's nothing new: no notification for a regular reader's lif
   assert.equal(at({ ...quiet, fixed: 2, articles: ['https://www.nytimes.com/a'] }, { alwaysConfirm: true }).show, false);
 });
 
+// A newer version out (src/release.js), as the service worker reports it
+const NEWER = { version: '0.22.0', href: 'https://readfree.example/#update', text: 'Read Free 0.22.0 is out' };
+
+test('a newer version: said at most every three days, never with a reason, in place of the donation link', () => {
+  const due = at(REGULAR, { newer: NEWER });
+  assert.deepEqual(due.update, NEWER);
+  assert.equal(due.donate, null, 'in place of the donation link, which was due');
+  assert.ok(at(REGULAR).donate, '(the donation link was due)');
+  assert.equal(due.show, true, "said even when there's otherwise nothing new");
+  assert.equal(due.hideAfterMs, notify.RULES.hideMs.update);
+  assert.equal(due.next.update.lastAt, NOW);
+  assert.equal(at({ ...REGULAR, update: { lastAt: NOW - 2 * D } }, { newer: NEWER }).update, null, 'said two days ago');
+  assert.deepEqual(at({ ...REGULAR, update: { lastAt: NOW - 3 * D } }, { newer: NEWER }).update, NEWER, 'three days on');
+  const withReason = at({}, { newer: NEWER });
+  assert.equal(withReason.explain, true);
+  assert.equal(withReason.update, null, 'never with a reason: the next article says it');
+  assert.equal(withReason.next.update.lastAt, 0);
+  assert.equal(at(REGULAR, { newer: NEWER, explainedHere: true }).update, null, 'nor after one shown while archive.today loaded');
+  assert.equal(at(REGULAR, { newer: null }).update, null);
+  assert.equal(at(REGULAR, { newer: { ...NEWER, href: 'http://readfree.example/' } }).update, null, 'https only');
+  assert.deepEqual(notify.barOptions(due, { siteName: 'NYT', reason: REASON }).newer,
+    { text: notify.COPY.updateText('0.22.0'), button: notify.COPY.updateButton, href: NEWER.href });
+  assert.equal(notify.barOptions(at(REGULAR), { siteName: 'NYT', reason: REASON }).newer, null);
+});
+
 test('the record: an article counts once, days are kept, junk is dropped', () => {
   const once = at({});
   assert.equal(once.next.fixed, 1);
@@ -76,7 +101,7 @@ test('the record: an article counts once, days are kept, junk is dropped', () =>
   assert.equal(again.next.fixed, 1, 'a reload');
   assert.deepEqual(again.next.days, ['2026-11-16']);
   assert.deepEqual(notify.normalize({ v: 1, fixed: -3, articles: [1, 'a'], days: ['x', '2026-11-01'], sites: { nyt: 'no', ft: 5 }, donate: { asks: NaN } }),
-    { v: 1, fixed: 0, articles: ['a'], days: ['2026-11-01'], sites: { ft: 5 }, donate: { lastAskAt: 0, snoozeUntil: 0, asks: 0 }, months: {} });
+    { v: 1, fixed: 0, articles: ['a'], days: ['2026-11-01'], sites: { ft: 5 }, donate: { lastAskAt: 0, snoozeUntil: 0, asks: 0 }, update: { lastAt: 0 }, months: {} });
   assert.deepEqual(notify.normalize(null), notify.fresh());
 });
 
@@ -223,6 +248,22 @@ test('status bar: the donation link and "Not now"', () => {
   const http = bar();
   http.b.finish('done', 'x', { donate: { text: 'x', href: 'http://example.com' } });
   assert.equal(http.q('.ask'), null, 'https only');
+  http.b.remove();
+});
+
+test('status bar: a newer version, with how to update; https only; only × closes it', () => {
+  const { b, q } = bar();
+  b.finish('done', "Removed NYT's wall.", { newer: { text: notify.COPY.updateText('0.22.0'), button: notify.COPY.updateButton, href: NEWER.href } });
+  assert.match(q('.newer .ask-text').textContent, /^Read Free 0\.22\.0 is out\./);
+  assert.equal(q('.newer a').href, NEWER.href);
+  assert.equal(q('.newer a').textContent, 'How to update ↗');
+  assert.equal(q('.newer a').target, '_blank');
+  assert.ok(q('.close'), 'closes with its ×, so the link can be used');
+  b.remove();
+  const http = bar();
+  http.b.finish('done', 'x', { newer: { text: 'x', href: 'http://readfree.example/' } });
+  assert.equal(http.q('.newer'), null, 'https only');
+  assert.equal(http.q('.close'), null);
   http.b.remove();
 });
 

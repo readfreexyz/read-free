@@ -37,8 +37,9 @@ Then, once, in Chrome (or Edge, Brave, Vivaldi):
 
 **By hand** (any system): unzip a release and pick the unzipped folder, or clone this repository
 and pick its **`extension/`** folder (not the project root: Chrome rejects it because
-`node_modules` contains files starting with `_`). Then do the same. It won't update itself: the
-toolbar menu says when a new version is out.
+`node_modules` contains files starting with `_`). Then do the same. It won't update itself: it
+says when a new version is out (in the toolbar menu, by a ↑ on its icon, and now and then in the
+status bar).
 
 To test the paywalled case, open the extension's **Details** and turn on **Allow in Incognito**.
 Then use an incognito window, which isn't signed in to NYT.
@@ -55,7 +56,8 @@ Once the status bar has faded, the toolbar icon keeps a green **✓** for as lon
 wall is off: there was one, and it's gone (the text was on the page all along, or archived text
 is showing). Pages that never had a wall get no mark, so on a metered site such as Reuters it
 tells you which articles were walled. The mark goes when you undo, or when you leave the page.
-The icon turns grey on sites where you've turned the extension off.
+The icon turns grey on sites where you've turned the extension off. While a newer version is out
+(for a copy loaded by hand), it carries a red **↑** instead, on every page without a ✓.
 
 ### Notifications
 
@@ -74,14 +76,20 @@ problem. Once a wall is off it says so, and adds:
   [Your boycott](#your-boycott)). **Not now** puts it off for 45 days, clicking through to donate
   for half a year, and **I've donated** in the settings for good (taken on trust). **Donate**
   opens the extension's own donation page (see [Donating](#donating)).
+- **A newer version, if you loaded Read Free by hand:** "Read Free [version] is out", with **How
+  to update** (the site's steps), at most every three days until you update. Never in the same
+  notification as a reason (it waits for the next article), and in place of the donation link.
+  Copies installed with the install script update themselves first, so they never see it
+  ([docs/auto-update.md](docs/auto-update.md#the-update-notice)).
 - **Nothing, once there's nothing new:** after your first 5 articles, a wall coming off shows no
   notification at all (the toolbar icon's ✓ still marks the page), and a reload of an article
   you've read never does. **Confirm every time a wall comes off** in the settings brings them
-  back. A notification with a reason or a donation link closes with its ×, or on its own; the line
+  back. A notification with a reason, a donation link or a newer version closes with its ×, or on its own; the line
   along its bottom shows how long it has left, and stops while you hover it.
 
 `extension/src/notify.js` makes these decisions from a small record in `chrome.storage.local`
-(articles read, days of use, when each outlet was explained, when you were last asked, and the
+(articles read, days of use, when each outlet was explained, when you were last asked, when it
+last mentioned a newer version, and the
 tally).
 **Start notifications over** in the settings goes back to the first day (keeping your answer to the donation link, and the tally).
 
@@ -128,9 +136,10 @@ Click the icon for the menu:
   amount] to UNRWA**, and **Or give some to keep Read Free alive** (see [Donating](#donating)).
 - **Settings**, and **Support the project** when there's no tally yet to show it under.
 - **Read Free [version] is out**, at the top, for a copy loaded by hand, once a release is a
-  day old. When the menu opens, at most once a day, it reads the release's version from Read
-  Free's site (`RELEASE_URLS`): no cookies, no referrer, nothing about you, and never from
-  article pages or on a timer ([docs/auto-update.md](docs/auto-update.md#the-menus-notice)).
+  day old, with **Get it** (the site's update steps). Once a day, in the background, Read Free
+  reads the release's version from its own site (`RELEASE_URLS`), and the menu does too when it
+  opens if a day has passed: no cookies, no referrer, nothing about you, and never from article
+  pages ([docs/auto-update.md](docs/auto-update.md#the-update-notice)).
 
 archive.today takes 8–15 seconds to send a snapshot nobody has asked for recently, and sometimes
 much longer, so the extension waits up to 90 seconds. It asks for the newest snapshot directly,
@@ -309,7 +318,7 @@ The content script picks the adapter for the current host. See
 | `extension/src/settings.js` | The settings in `chrome.storage.sync`: on or off everywhere, the sites turned off (by adapter id), the archive.today address; and the donation link. |
 | `extension/src/notify.js` | Decides what the status bar adds once a wall is off: the outlet's reason (once, then on request), the donation link (rarely), or no notification at all. |
 | `extension/src/reasons.js` | Why each outlet is boycotted: one documented criticism of its Gaza coverage and its source. |
-| `extension/src/release.js` | The toolbar menu's "Read Free [version] is out": `latest.txt` from the release addresses (`RELEASE_URLS`), at most once a day. |
+| `extension/src/release.js` | "Read Free [version] is out", for copies loaded by hand (the menu, the toolbar icon's ↑, the status bar): `latest.txt` from the release addresses (`RELEASE_URLS`), at most once a day. |
 | `extension/src/donations.js` | The ways to give to Read Free: the list from Read Free's site (`DONATIONS_URLS`), checked and kept, or the built-in Ko-fi link. |
 | `extension/src/tally.js` | The reader's tally in figures and words, and what subscribing would have cost: each outlet's regular price with its source, and the exchange rates. |
 | `extension/popup/` | The toolbar menu. `view.js` turns the tab's state (asked of its content script with `nytfix:state`) and the settings into words and a button. |
