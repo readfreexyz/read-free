@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- The picture apps show when readfree.xyz is shared (og:image). Drawn into website/og.png:
+       rsvg-convert -w 1200 -h 630 brand/og.svg -o website/og.png
+       The extension's watermelon (themes/solidarity/icon.svg) on undyed cotton under the
+       keffiyeh's fishnet, between two of its edges. Keep og:image:alt in website/index.html in
+       step with the words. -->
+  <defs>
+    <pattern id="net" width="28" height="28" patternUnits="userSpaceOnUse">
+      <g transform="scale(2.333)" fill="#141414">
+        <path d="M0 6L6 0L12 6L6 12Z" fill="none" stroke="#141414" stroke-width="1.4"/>
+        <rect x="5.1" y="5.1" width="1.8" height="1.8" transform="rotate(45 6 6)"/>
+      </g>
+    </pattern>
+    <pattern id="edge" width="40.5" height="36" patternUnits="userSpaceOnUse">
+      <g transform="scale(2.25)" fill="#141414">
+        <rect width="18" height="2"/>
+        <rect y="3.2" width="18" height=".8"/>
+        <path transform="translate(1 11.2) rotate(-32)" d="M0 0C2.4-2.3 6.6-2.3 9 0C6.6 2.3 2.4 2.3 0 0Z"/>
+        <path transform="translate(10 4.8) rotate(32)" d="M0 0C2.4-2.3 6.6-2.3 9 0C6.6 2.3 2.4 2.3 0 0Z"/>
+        <rect y="12" width="18" height=".8"/>
+        <rect y="14" width="18" height="2"/>
+      </g>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="#f7f5ef"/>
+  <rect width="1200" height="630" fill="url(#net)" opacity="0.06"/>
+  <rect width="1200" height="36" fill="url(#edge)"/>
+  <rect y="594" width="1200" height="36" fill="url(#edge)"/>
+
+  <g transform="translate(96 168) scale(2.15)">
+    <path d="M64.00 6.00L0.82 103.29A116 116 0 0 0 127.18 103.29Z" fill="#0b6b34"/>
+    <path d="M64.00 6.00L5.18 96.58A108 108 0 0 0 122.82 96.58Z" fill="#f4f1e6"/>
+    <path d="M64.00 6.00L8.99 90.71A101 101 0 0 0 119.01 90.71Z" fill="#d6283a"/>
+    <g fill="#141414">
+      <ellipse cx="56" cy="52" rx="3.2" ry="5.6" transform="rotate(170.1 56 52)"/>
+      <ellipse cx="72" cy="52" rx="3.2" ry="5.6" transform="rotate(-170.1 72 52)"/>
+      <ellipse cx="46" cy="76" rx="3.4" ry="6" transform="rotate(165.6 46 76)"/>
+      <ellipse cx="64" cy="80" rx="3.4" ry="6" transform="rotate(-180.0 64 80)"/>
+      <ellipse cx="82" cy="76" rx="3.4" ry="6" transform="rotate(-165.6 82 76)"/>
+    </g>
+  </g>
+
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="432" y="262" font-size="112" font-weight="700" letter-spacing="-3" fill="#141414">Read Free</text>
+    <text x="436" y="336" font-size="44" font-weight="500" fill="#007a3d">Read the news without</text>
+    <text x="436" y="390" font-size="44" font-weight="500" fill="#007a3d">supporting genocide.</text>
+    <text x="437" y="458" font-size="29" fill="#5e605c">A Chrome extension · readfree.xyz</text>
+  </g>
+</svg>

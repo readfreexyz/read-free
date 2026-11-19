@@ -317,7 +317,8 @@ The content script picks the adapter for the current host. See
 | `extension/give/` | The donation page: what you withheld, UNRWA's link, and the ways to give to Read Free (Ko-fi's donation panel, other links). |
 | `website/_headers` | Makes Cloudflare send `Access-Control-Allow-Origin: *` with every file of the site, so the extension can read `latest.txt` and `donate.json`. |
 | `website/donate.json` | The list of ways to give, to publish on Read Free's site (see [Donating](#donating)). |
-| `website/index.html` | The site's front page: the install command, the zip, the steps in Chrome and the outlets. `tools/release.sh build` writes the release in (see [docs/auto-update.md](docs/auto-update.md)). |
+| `website/index.html` | The site's front page: the install command, the zip, the steps in Chrome and the outlets, and a note for visitors on a phone. `tools/release.sh build` writes the release in (see [docs/auto-update.md](docs/auto-update.md)). |
+| `website/og.png` | The picture apps show when the site's link is shared (the page's `og:image`). Drawn from `brand/og.svg`: `rsvg-convert -w 1200 -h 630 brand/og.svg -o website/og.png`. |
 | `website/install.sh` | Installs the newest signed release on macOS or Linux and updates it every hour (see [docs/auto-update.md](docs/auto-update.md)). |
 | `tools/release.sh` | Makes the release signing key (`keygen`), and builds and signs a release into `dist/` (`build`). |
 | `tools/publish.sh` | Publishes `dist/` to the site (a Cloudflare Worker) and its mirror (GitHub Pages), then waits until both serve it (see [docs/auto-update.md](docs/auto-update.md)). |

@@ -1,6 +1,7 @@
 // The site's front page (website/index.html): its outlets are the extension's live sites, it loads
-// nothing from elsewhere, its script is the one its CSP allows, tools/release.sh fills each of its
-// fields, and its install command follows the address it's served from only when that's plain.
+// nothing from elsewhere, its link-preview picture is beside it, its script is the one its CSP
+// allows, tools/release.sh fills each of its fields, and its install command follows the address
+// it's served from only when that's plain.
 // test/install.test.js checks a page release.sh built.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -42,6 +43,22 @@ test('it loads nothing from elsewhere', () => {
   }
   for (const url of PAGE.match(/url\([^)]*\)/g) || []) assert.match(url, /^url\("?data:/, url);
   assert.equal(doc.querySelector('meta[name="referrer"]').content, 'no-referrer');
+});
+
+test('link previews: og: tags with the site\'s address, and their picture beside the page', () => {
+  const meta = property => doc.querySelector(`meta[property="${property}"]`)?.content;
+  assert.equal(meta('og:url'), '{{site}}');
+  assert.equal(meta('og:description'), doc.querySelector('meta[name="description"]').content);
+  assert.equal(doc.querySelector('meta[name="twitter:card"]')?.content, 'summary_large_image');
+  // Absolute (apps fetch it without the page), and in website/ itself: release.sh publishes
+  // only that level
+  const image = meta('og:image');
+  assert.match(image || '', /^\{\{site\}\}[a-z0-9-]+\.png$/);
+  const png = fs.readFileSync(path.join(ROOT, 'website', image.replace('{{site}}', '')));
+  assert.equal(png.toString('latin1', 12, 16), 'IHDR');
+  assert.equal(png.readUInt32BE(16), Number(meta('og:image:width')));
+  assert.equal(png.readUInt32BE(20), Number(meta('og:image:height')));
+  assert.ok(png.length < 300 * 1024, 'small enough for every app that shows previews');
 });
 
 test('tools/release.sh fills each of its fields', () => {

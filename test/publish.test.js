@@ -70,7 +70,7 @@ exit 0
   const publish = (...args) => spawnSync('/bin/sh', [PUBLISH, ...args], { encoding: 'utf8', env, timeout: 60000 });
   const deployed = () => fs.existsSync(npxLog);
   const clearNpx = () => { for (const f of [npxLog, `${npxLog}.json`, `${npxLog}.files`]) fs.rmSync(f, { force: true }); };
-  const files = ['.nojekyll', '_headers', 'donate.json', 'index.html', 'install.sh', 'latest.txt', 'latest.txt.sig', `read-free-${version}.zip`].sort();
+  const files = ['.nojekyll', '_headers', 'donate.json', 'index.html', 'install.sh', 'latest.txt', 'latest.txt.sig', 'og.png', `read-free-${version}.zip`].sort();
 
   await t.test('publishes: the mirror committed as its own identity in UTC, the site deployed from elsewhere', () => {
     const res = publish();

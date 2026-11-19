@@ -160,6 +160,9 @@ test('install, update, and refusing every bad release', { skip }, async t => {
     assert.equal(installed(), '1.0.0');
     assert.equal(fs.readFileSync(path.join(base, 'update.sh'), 'utf8'), fs.readFileSync(script, 'utf8'));
     assert.match(res.stdout, /Load unpacked/);
+    // Afterwards: the installed copy, for status and uninstall; the copy that was run can go
+    assert.ok(res.stdout.includes(`sh '${path.join(base, 'update.sh')}' uninstall`), `how to stop the updates:\n${res.stdout}`);
+    assert.ok(res.stdout.includes(`You can delete ${script}: Read Free keeps its own copy`), 'the copy that was run can go');
     assert.deepEqual(leftovers(), []);
     const again = sh('update');
     assert.equal(again.status, 0);

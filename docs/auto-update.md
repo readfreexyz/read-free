@@ -15,8 +15,8 @@ A release is these files, uploaded to the site and to each mirror (`RELEASE_URLS
 - `latest.txt`: the newest release, in a few lines: `read-free-release 1`, then `version=`, `zip=` (the zip's name), `sha256=`, `size=` and `date=`.
 - `latest.txt.sig`: its signature, by the release key (`ssh-keygen -Y sign`, namespace `read-free-release`).
 - `install.sh`: the install script, with the key's public half (`SIGNER`) and the addresses written in.
-- `index.html`: the front page (`website/index.html`), with the release's version, date, zip, size and SHA-256 and the site's address written in. It shows the install command and the zip, the steps in Chrome, and the outlets. It loads nothing from elsewhere; its one script makes the command use the address the page is served from, if that's a plain https one (so a mirror installs from itself), and adds a Copy button. Without the script the page is complete.
-- The rest of `website/`: `donate.json`, and `_headers`, which tells Cloudflare to send `Access-Control-Allow-Origin: *` with every file (GitHub Pages sends it anyway, and serves `_headers` as a plain file).
+- `index.html`: the front page (`website/index.html`), with the release's version, date, zip, size and SHA-256 and the site's address written in. It shows the install command and the zip, the steps in Chrome, and the outlets, and tells visitors on a phone or tablet that Read Free needs a computer (by CSS, from the kind of pointer). It loads nothing from elsewhere (its `og:` tags name `og.png` for apps that preview a shared link, but the page never loads it); its one script makes the command use the address the page is served from, if that's a plain https one (so a mirror installs from itself), and adds a Copy button. Without the script the page is complete.
+- The rest of `website/`: `donate.json`, `og.png` (the link preview's picture), and `_headers`, which tells Cloudflare to send `Access-Control-Allow-Origin: *` with every file (GitHub Pages sends it anyway, and serves `_headers` as a plain file).
 
 ### Installing
 
@@ -26,7 +26,7 @@ curl -fsSLO https://readfree.xyz/install.sh && sh install.sh
 
 It downloads the newest release, checks it, unpacks it into `~/Library/Application Support/Read Free/extension` (Linux: `~/.local/share/read-free/extension`), keeps a copy of itself next to it as `update.sh`, and schedules `update.sh update` every hour: a LaunchAgent (`local.readfree.update`) on macOS, a crontab line on Linux. Then, once, in Chrome: Developer mode on, **Load unpacked**, that folder. Developer mode must stay on (see [The extension reloads itself](#the-extension-reloads-itself)).
 
-`sh install.sh status` shows the folder, the version and the log; `sh install.sh uninstall` stops the updates. `install --no-schedule` installs without them.
+`sh install.sh status` shows the folder, the version and the log; `sh install.sh uninstall` stops the updates. `install --no-schedule` installs without them. At the end it prints those two commands with the installed copy (`update.sh`), and says the `install.sh` that was run can be deleted. On macOS it also says that macOS may announce a new background item: System Settings lists the LaunchAgent under Login Items as `sh`, the program it runs.
 
 ### What an update checks
 
