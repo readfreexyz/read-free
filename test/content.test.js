@@ -69,7 +69,12 @@ async function waitFor(check, timeout = 3000) {
 // after the redirect), or 404 when the timemap has none. Fetching through /newest/ records only
 // the /newest/ URL in `fetched`.
 // storage: chrome.storage.local (saved articles); sync: chrome.storage.sync (settings).
-// newer: what the service worker says when asked for a newer version (release.notice()), or null.
+// newer: what the service worker says when asked for a newer version (release.notice()), or null;
+// or a function giving the reply (a promise that never settles: no answer, as while it starts).
+// What the content scripts put on the page's global on purpose: their namespace, and the stand-ins
+// page/piano-adblock.js pins for La Libre's ad-blocker check
+const MEANT_GLOBALS = new Set(['NYTFix', '__nytfixLoaded', 'setNptTechAdblockerCookie', 'blockAdBlock']);
+
 function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = memoryArea(), sync = memoryArea(), scripts = scriptsFor(url), newer = null } = {}) {
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', e => { if (!/Not implemented: (window\.scroll|Window's scroll)/.test(e.message)) console.error(e); });
@@ -89,7 +94,7 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
           marks.push(msg.state);
           return undefined;
         }
-        if (msg.type === 'nytfix:newer') return newer;
+        if (msg.type === 'nytfix:newer') return typeof newer === 'function' ? newer() : newer;
         fetched.push(msg.url);
         return answer(msg.url);
       },
@@ -111,7 +116,13 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
     }
     return { ok: true, status: 404, url: requested, body: '' };
   }
+  // Chrome runs content scripts in strict mode, where assigning to a name never declared throws;
+  // jsdom quietly makes a global of it instead (0.22.0 shipped one, "newer"). So a global the
+  // scripts didn't mean to make fails the test when the page is closed.
+  const before = new Set(Object.getOwnPropertyNames(window));
   for (const src of scripts) window.eval(src);
+  // (window[0], window[1]…: the page's frames, not globals)
+  const leaked = () => Object.getOwnPropertyNames(window).filter(name => !before.has(name) && !MEANT_GLOBALS.has(name) && !/^\d+$/.test(name));
 
   return {
     window, doc, fetched, marks, storage, logs,
@@ -124,7 +135,11 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
     body: () => doc.querySelector('.nytfix-body'),
     banner: () => doc.getElementById('nytfix-banner'),
     button: label => [...(doc.getElementById('nytfix-banner')?.querySelectorAll('button') || [])].find(b => b.textContent === label),
-    close: () => window.close(),
+    close: () => {
+      const stray = leaked();
+      window.close();
+      if (stray.length) throw new Error(`the content scripts made globals they never declared: ${stray.join(', ')}`);
+    },
   };
 }
 
@@ -523,6 +538,23 @@ test('toolbar: undo puts the paywall back, a second click swaps again from the c
     assert.equal(page.mark(), 'swapped');
   } finally {
     page.close();
+  }
+});
+
+// Chrome runs content scripts in strict mode, where an undeclared name throws; jsdom quietly
+// makes a global of one that's assigned. So the answer must come late, or never, for a missing
+// declaration to show here (0.22.0 shipped one: "Something went wrong: newer is not defined").
+test("the service worker doesn't answer about a newer version: the wall still comes off with its usual message", async () => {
+  for (const [label, newer] of [['no answer', () => new Promise(() => {})], ['an error', () => Promise.reject(new Error('Receiving end does not exist.'))]]) {
+    const page = boot({ html: livePageHtml({ wall: 'login' }), newer });
+    try {
+      await waitFor(() => statusText(page));
+      assert.match(statusText(page), /Removed the login wall/, label);
+      assert.doesNotMatch(statusText(page), /Something went wrong/, label);
+      assert.equal(page.doc.getElementById('nytfix-status').shadowRoot.querySelector('.newer'), null, label);
+    } finally {
+      page.close();
+    }
   }
 });
 

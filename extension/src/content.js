@@ -50,6 +50,9 @@
   // to add once a wall is off takes no waiting.
   let notifyState = notifyLib.fresh();
   let explainedHere = false; // the reason was shown on this page, while archive.today loaded
+  // A newer version out, as the service worker answers when the page starts (release.notice()),
+  // or null: unknown, none, or no answer yet.
+  let newer = null;
   let loading = false;
   let undoLift = null;      // puts the site's wall back
   let undoSwap = null;      // takes the archived text out again
