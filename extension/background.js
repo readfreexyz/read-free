@@ -53,7 +53,7 @@ function showNewer(record) {
   chrome.action.setTitle({ title: restingTitle() }).catch(ignore);
 }
 const checkRelease = () => release.refresh(chrome.storage.local).then(showNewer).catch(ignore);
-release.load(chrome.storage.local).then(showNewer).catch(ignore);
+const newerLoaded = release.load(chrome.storage.local).then(showNewer).catch(ignore);
 chrome.alarms?.onAlarm.addListener(alarm => { if (alarm.name === RELEASE_ALARM) checkRelease(); });
 Promise.resolve(chrome.alarms?.get(RELEASE_ALARM))
   .then(alarm => alarm || chrome.alarms?.create(RELEASE_ALARM, { delayInMinutes: 1, periodInMinutes: RELEASE_ALARM_MINUTES }))
@@ -75,14 +75,18 @@ chrome.storage.onChanged?.addListener((changes, area) => {
   if (area === 'local' && changes[release.KEY]) showNewer(changes[release.KEY].newValue);
 });
 const syncEnabled = () => settings.load(chrome.storage.sync).then(p => showEnabled(p.enabled)).catch(ignore);
-syncEnabled();
+// What a tab without a mark of its own shows (off everywhere, a newer version) is read from
+// storage each time the service worker starts. A content script's message can be what starts it,
+// so tab marks wait for that, or they'd go by the defaults above.
+const loaded = Promise.all([newerLoaded, syncEnabled()]);
 chrome.runtime.onStartup?.addListener(syncEnabled);
 settings.onChange(chrome.storage, p => { if (p.enabled !== enabled) showEnabled(p.enabled); });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false;
   if (msg?.type === 'nytfix:mark') {
-    if (sender.tab?.id !== undefined) markTab(sender.tab.id, msg.state, msg.title);
+    const tabId = sender.tab?.id;
+    if (tabId !== undefined) loaded.then(() => markTab(tabId, msg.state, msg.title));
     return false;
   }
   // The status bar's donation link: the extension's own page, next to the reader's tab

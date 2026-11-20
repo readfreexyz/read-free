@@ -51,10 +51,12 @@ test("toolbar mark: a green check on the tab's icon while the wall is off, clear
   const w = worker();
   await tick();
   w.send({ type: 'nytfix:mark', state: 'lifted', title: "Removed Reuters's wall." }, { id: 'nytfix', tab: { id: 7 } });
+  await tick();
   assert.deepEqual(w.last('text'), { tabId: 7, text: '✓' });
   assert.equal(w.last('color').tabId, 7);
   assert.equal(w.last('title').title, "Read Free: Removed Reuters's wall.");
   w.send({ type: 'nytfix:mark', state: null }, { id: 'nytfix', tab: { id: 7 } });
+  await tick();
   assert.deepEqual(w.last('text'), { tabId: 7, text: '' });
   assert.deepEqual(w.last('title'), { tabId: 7, title: 'Read Free' });
 });
@@ -75,6 +77,7 @@ test("toolbar mark: only the extension's own content scripts can set it", async 
   const before = w.calls.length;
   w.send({ type: 'nytfix:mark', state: 'lifted', title: 'x' }, { id: 'someone-else', tab: { id: 7 } });
   w.send({ type: 'nytfix:mark', state: 'lifted', title: 'x' }, { id: 'nytfix' }); // no tab
+  await tick();
   assert.equal(w.calls.length, before);
 });
 
@@ -88,6 +91,7 @@ test('toolbar icon: grey while off everywhere, and on a tab whose site is off', 
   assert.deepEqual(w.last('title'), { title: 'Read Free' });
 
   w.send({ type: 'nytfix:mark', state: 'off', title: 'Off on The New York Times.' }, { id: 'nytfix', tab: { id: 3 } });
+  await tick();
   assert.deepEqual(w.last('icon'), { tabId: 3, path: { 16: 'icons/off-16.png', 32: 'icons/off-32.png' } });
   assert.deepEqual(w.last('title'), { tabId: 3, title: 'Read Free: Off on The New York Times.' });
 });
@@ -161,8 +165,10 @@ test("a tab's ✓ cleared: back to the arrow; the menu's own check moves it too"
   const w = worker({ local: memoryArea({ release: releaseRecord('0.22.0') }) });
   await settle();
   w.send({ type: 'nytfix:mark', state: 'lifted', title: "Removed Reuters's wall." }, { id: 'nytfix', tab: { id: 7 } });
+  await tick();
   assert.deepEqual(w.last('text'), { tabId: 7, text: '✓' });
   w.send({ type: 'nytfix:mark', state: null }, { id: 'nytfix', tab: { id: 7 } });
+  await tick();
   assert.deepEqual(w.last('text'), { tabId: 7, text: '↑' });
   assert.deepEqual(w.last('color'), { tabId: 7, color: '#c2415b' });
   assert.deepEqual(w.last('title'), { tabId: 7, title: 'Read Free: version 0.22.0 is out' });
@@ -171,6 +177,21 @@ test("a tab's ✓ cleared: back to the arrow; the menu's own check moves it too"
   await settle();
   quiet.changeLocal('release', releaseRecord('0.22.0'));
   assert.deepEqual(quiet.last('text'), { text: '↑' }, 'the menu found it');
+});
+
+// Chrome stops an idle service worker, and a content script's message starts it again: the
+// mark waits for what's saved (a newer version, off everywhere), not the defaults before it loads.
+test("a mark that wakes the service worker: the arrow and the tooltip from what's saved", async () => {
+  const w = worker({ local: memoryArea({ release: releaseRecord('0.22.0') }) });
+  w.send({ type: 'nytfix:mark', state: null }, { id: 'nytfix', tab: { id: 7 } }); // nothing loaded yet
+  await settle();
+  assert.deepEqual(w.last('text'), { tabId: 7, text: '↑' });
+  assert.deepEqual(w.last('title'), { tabId: 7, title: 'Read Free: version 0.22.0 is out' });
+
+  const off = worker({ sync: memoryArea({ settings: { enabled: false } }) });
+  off.send({ type: 'nytfix:mark', state: null }, { id: 'nytfix', tab: { id: 3 } });
+  await settle();
+  assert.deepEqual(off.last('title'), { tabId: 3, title: 'Read Free: off on all sites' });
 });
 
 test('the welcome page: once, when Read Free is first loaded; never on an update or a reload', async () => {
