@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- The page Read Free opens once, when it's first loaded (background.js, chrome.runtime.onInstalled
+     with reason "install"; never on an update or a reload): it's on, what to do next, the outlets. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Read Free is on</title>
+  <link rel="stylesheet" href="../ui/theme.css">
+  <link rel="stylesheet" href="../ui/ui.css">
+  <link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+  <div class="nf-band" aria-hidden="true"></div>
+  <header class="top">
+    <div class="top-inner">
+      <img class="logo" src="../icons/icon.svg" alt="">
+      <div>
+        <h1>Read Free is on</h1>
+        <p class="lede">Open a paywalled article from one of the outlets below and Read Free takes the
+          wall off. The first time you read each outlet, it tells you why it's boycotted, with the
+          source.</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Three things to know</h2>
+      <ol class="tips">
+        <li><b>Reload any news tabs that were already open.</b> Read Free works on pages opened from
+          now on.</li>
+        <li><b>Leave Developer mode on</b> in <code>chrome://extensions</code>. With it off, Chrome
+          turns Read Free off.</li>
+        <li><b>Can't see the watermelon next to the address bar?</b> Click the puzzle piece there and
+          pin Read Free. Its button shows what it did on each page, and its settings.</li>
+      </ol>
+    </section>
+
+    <section class="card" id="outlets-card" hidden>
+      <h2>The outlets</h2>
+      <ul class="outlets" id="outlets"></ul>
+    </section>
+
+    <div class="actions">
+      <button class="nf-button" id="settings" type="button">Settings</button>
+      <button class="nf-button nf-primary" id="done" type="button">Close this tab</button>
+    </div>
+  </main>
+
+  <script src="../ui/sites.js"></script>
+  <script src="welcome.js"></script>
+</body>
+</html>

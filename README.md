@@ -32,8 +32,13 @@ Then, once, in Chrome (or Edge, Brave, Vivaldi):
    off, Chrome turns Read Free off when it updates itself.
 2. Click **Load unpacked** and pick the folder the script printed. On a Mac, press Cmd+Shift+G
    in that window and paste it (the script copies it).
-3. Pin **Read Free** from the puzzle-piece menu so its button stays in the toolbar.
+3. Read Free's watermelon shows in the toolbar, next to the address bar. If it doesn't, click the
+   puzzle piece there and pin **Read Free**.
 4. Reload any tabs that were already open.
+
+Read Free then opens a welcome page (once, never on an update), and the site's front page says
+it's installed and which version (`extension/src/site-mark.js`, which only writes that line into
+the page). The site shows each Chrome step with a picture.
 
 **By hand** (any system): unzip a release and pick the unzipped folder, or clone this repository
 and pick its **`extension/`** folder (not the project root: Chrome rejects it because
@@ -323,6 +328,8 @@ The content script picks the adapter for the current host. See
 | `extension/src/tally.js` | The reader's tally in figures and words, and what subscribing would have cost: each outlet's regular price with its source, and the exchange rates. |
 | `extension/popup/` | The toolbar menu. `view.js` turns the tab's state (asked of its content script with `nytfix:state`) and the settings into words and a button. |
 | `extension/options/` | The settings page. |
+| `extension/welcome/` | The page Read Free opens once, when it's first loaded: what to do next, and the outlets. |
+| `extension/src/site-mark.js` | On Read Free's own site (the release addresses): writes "Read Free [version] is installed in this browser" into the front page's placeholder. Reads nothing, sends nothing. |
 | `extension/give/` | The donation page: what you withheld, UNRWA's link, and the ways to give to Read Free (Ko-fi's donation panel, other links). |
 | `website/_headers` | Makes Cloudflare send `Access-Control-Allow-Origin: *` with every file of the site, so the extension can read `latest.txt` and `donate.json`. |
 | `website/donate.json` | The list of ways to give, to publish on Read Free's site (see [Donating](#donating)). |

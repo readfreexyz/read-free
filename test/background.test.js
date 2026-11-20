@@ -13,11 +13,11 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 // fetch: answers for Read Free's site (latest.txt).
 function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); } } = {}) {
   const calls = [];
-  const listeners = { message: [], changed: [], alarm: [] };
+  const listeners = { message: [], changed: [], alarm: [], installed: [] };
   const alarms = {};
   const record = name => async details => { calls.push([name, details]); };
   const chrome = {
-    runtime: { id: 'nytfix', onMessage: { addListener: fn => listeners.message.push(fn) }, onStartup: { addListener: () => {} }, getPlatformInfo: async () => ({}), getURL: p => `chrome-extension://nytfix/${p}`, getManifest: () => ({ version }) },
+    runtime: { id: 'nytfix', onMessage: { addListener: fn => listeners.message.push(fn) }, onStartup: { addListener: () => {} }, getPlatformInfo: async () => ({}), getURL: p => `chrome-extension://nytfix/${p}`, getManifest: () => ({ version }), onInstalled: { addListener: fn => listeners.installed.push(fn) } },
     storage: { sync, local, onChanged: { addListener: fn => listeners.changed.push(fn) } },
     alarms: {
       get: async name => alarms[name],
@@ -41,9 +41,10 @@ function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0',
   const changeSettings = value => { for (const fn of listeners.changed) fn({ settings: { newValue: value } }, 'sync'); };
   const changeLocal = (key, value) => { for (const fn of listeners.changed) fn({ [key]: { newValue: value } }, 'local'); };
   const fireAlarm = name => { for (const fn of listeners.alarm) fn({ name }); };
+  const installed = reason => { for (const fn of listeners.installed) fn({ reason }); };
   // Plain copies: objects made inside the vm context have their own prototypes.
   const last = name => { const found = calls.filter(([n]) => n === name).pop()?.[1]; return found && JSON.parse(JSON.stringify(found)); };
-  return { calls, send, last, changeSettings, changeLocal, fireAlarm, alarms };
+  return { calls, send, last, changeSettings, changeLocal, fireAlarm, installed, alarms };
 }
 
 test("toolbar mark: a green check on the tab's icon while the wall is off, cleared on request", async () => {
@@ -170,4 +171,22 @@ test("a tab's ✓ cleared: back to the arrow; the menu's own check moves it too"
   await settle();
   quiet.changeLocal('release', releaseRecord('0.22.0'));
   assert.deepEqual(quiet.last('text'), { text: '↑' }, 'the menu found it');
+});
+
+test('the welcome page: once, when Read Free is first loaded; never on an update or a reload', async () => {
+  const local = memoryArea();
+  const w = worker({ local });
+  await settle();
+  const tabs = () => w.calls.filter(([name]) => name === 'tab').map(([, d]) => d.url);
+  w.installed('update');
+  w.installed('chrome_update');
+  await settle();
+  assert.deepEqual(tabs(), [], 'an update, a reload or a new Chrome: nothing');
+  w.installed('install');
+  await settle();
+  assert.deepEqual(tabs(), ['chrome-extension://nytfix/welcome/welcome.html']);
+  assert.ok(local.data.welcomed, 'remembered');
+  w.installed('install');
+  await settle();
+  assert.equal(tabs().length, 1, 'never twice');
 });

@@ -61,6 +61,15 @@ test('link previews: og: tags with the site\'s address, and their picture beside
   assert.ok(png.length < 300 * 1024, 'small enough for every app that shows previews');
 });
 
+test("the placeholder Read Free fills in once it's installed, and the link to its source", () => {
+  const note = doc.getElementById('installed');
+  assert.ok(note?.classList.contains('installed'), 'src/site-mark.js writes into #installed.installed');
+  assert.equal(note.hidden, true, 'hidden until then');
+  assert.equal(note.textContent, '');
+  const repo = [...doc.querySelectorAll('a')].filter(a => a.getAttribute('href') === 'https://github.com/readfreexyz/read-free');
+  assert.ok(repo.length >= 1, 'links the open-source repository');
+});
+
 test('tools/release.sh fills each of its fields', () => {
   const fields = new Set([...PAGE.matchAll(/\{\{([a-z0-9]+)\}\}/g)].map(m => m[1]));
   const release = fs.readFileSync(path.join(ROOT, 'tools', 'release.sh'), 'utf8');

@@ -58,6 +58,18 @@ chrome.alarms?.onAlarm.addListener(alarm => { if (alarm.name === RELEASE_ALARM) 
 Promise.resolve(chrome.alarms?.get(RELEASE_ALARM))
   .then(alarm => alarm || chrome.alarms?.create(RELEASE_ALARM, { delayInMinutes: 1, periodInMinutes: RELEASE_ALARM_MINUTES }))
   .catch(ignore);
+// The welcome page (welcome/), once: when Read Free is first loaded, never on an update or a
+// reload (Chrome says "update" for those), and never twice (a flag in chrome.storage.local, in
+// case a reload is ever reported as an install).
+const WELCOMED = 'welcomed';
+chrome.runtime.onInstalled?.addListener(({ reason }) => {
+  if (reason !== 'install') return;
+  chrome.storage.local.get(WELCOMED).then(saved => {
+    if (saved?.[WELCOMED]) return;
+    chrome.storage.local.set({ [WELCOMED]: Date.now() }).catch(ignore);
+    chrome.tabs.create({ url: chrome.runtime.getURL('welcome/welcome.html') }).catch(ignore);
+  }).catch(ignore);
+});
 // The menu checks too when it opens: follow its answer.
 chrome.storage.onChanged?.addListener((changes, area) => {
   if (area === 'local' && changes[release.KEY]) showNewer(changes[release.KEY].newValue);
