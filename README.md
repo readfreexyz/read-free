@@ -30,8 +30,10 @@ Then, once, in Chrome (or Edge, Brave, Vivaldi):
 
 1. Go to `chrome://extensions` and turn on **Developer mode** (top right). Leave it on: with it
    off, Chrome turns Read Free off when it updates itself.
-2. Click **Load unpacked** and pick the folder the script printed. On a Mac, press Cmd+Shift+G
-   in that window and paste it (the script copies it).
+2. Drag the folder onto that page: on a Mac the script opens it in Finder, selected (it's called
+   `extension`); Chrome loads a folder dropped there once Developer mode is on. Or click **Load
+   unpacked** and pick the folder the script printed: on a Mac, press Cmd+Shift+G in that window
+   and paste it (the script copies it).
 3. Read Free's watermelon shows in the toolbar, next to the address bar. If it doesn't, click the
    puzzle piece there and pin **Read Free**.
 4. Reload any tabs that were already open.

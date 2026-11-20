@@ -127,6 +127,11 @@
     .shot .ui-icon { fill: #444746; }
     .shot .dim { opacity: 0.45; }
     .shot .ring { fill: none; stroke: #d6283a; stroke-width: 3; }
+    .shot .ui-folder { fill: #5aa7ec; }
+    .shot .ui-arrow { fill: none; stroke: #444746; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .shot .ui-page { fill: #f8fafd; stroke: #c4c7c5; stroke-width: 1.5; }
+    .shot .ui-small { font: 600 14px var(--font); fill: #1f1f1f; }
+    .setup .aside { display: block; margin-top: 4px; color: var(--muted); font-size: 13.5px; }
     /* Filled in by Read Free itself, when it's installed in this browser */
     .installed { margin: 16px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 650; }
     .setup li::before { content: counter(setup); position: absolute; top: 1px; left: 0; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 12px; font-weight: 700; }
@@ -222,16 +227,18 @@
               <circle class="ui-knob" cx="322" cy="32" r="8"/>
               <rect class="ring" x="136" y="8" width="214" height="48" rx="12"/>
             </svg></li>
-          <li>Click <b>Load unpacked</b> and choose the folder: the one the install script showed,
-            or your Read Free folder. On a Mac, press Cmd+Shift+G in that window to paste a path
-            (the script copies it for you).
-            <svg class="shot" viewBox="0 0 360 64" role="img" aria-label="The Load unpacked button, at the left under the Extensions page's title once Developer mode is on">
-              <rect class="ui-button" x="16" y="13" width="142" height="38" rx="19"/>
-              <text class="ui-link" x="87" y="38" text-anchor="middle">Load unpacked</text>
-              <rect class="ui-button dim" x="176" y="13" width="150" height="38" rx="19"/>
-              <text class="ui-link dim" x="251" y="38" text-anchor="middle">Pack extension</text>
-              <rect class="ring" x="8" y="5" width="158" height="54" rx="27"/>
-            </svg></li>
+          <li>Drag the folder onto that page: the one the install script opened in Finder (it's
+            called <b>extension</b>), or your Read Free folder.
+            <svg class="shot" viewBox="0 0 360 64" role="img" aria-label="A folder called extension, dragged onto the Extensions page">
+              <path class="ui-folder" transform="translate(20 15) scale(1.05)" d="M0 6a3 3 0 0 1 3-3h9l4 4h13a3 3 0 0 1 3 3v16a3 3 0 0 1-3 3H3a3 3 0 0 1-3-3z"/>
+              <text class="ui-text" x="62" y="38">extension</text>
+              <path class="ui-arrow" d="M150 32h48m-9-8l9 8-9 8"/>
+              <rect class="ui-page" x="214" y="12" width="128" height="40" rx="8"/>
+              <text class="ui-small" x="226" y="37">Extensions</text>
+              <rect class="ring" x="206" y="5" width="144" height="54" rx="12"/>
+            </svg>
+            <span class="aside">Or click <b>Load unpacked</b> and choose it. On a Mac, press Cmd+Shift+G in
+            that window to paste its path (the script copies it for you).</span></li>
           <li>Read Free's watermelon shows in the toolbar, next to the address bar. If it doesn't,
             click the puzzle piece there and pin <b>Read Free</b>.
             <svg class="shot" viewBox="0 0 360 64" role="img" aria-label="Chrome's toolbar: the address bar, then Read Free's watermelon button and the puzzle-piece menu">
