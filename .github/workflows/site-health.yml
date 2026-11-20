@@ -38,7 +38,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: What the last run kept
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .health-state.json
           key: site-health-state-${{ github.run_id }}
@@ -47,7 +47,7 @@ jobs:
         run: node tools/site-health.mjs --samples 2 --state .health-state.json
       - name: Keep it for the next run
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .health-state.json
           key: site-health-state-${{ github.run_id }}
