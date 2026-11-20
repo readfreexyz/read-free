@@ -81,3 +81,31 @@ test("aidLink: UNRWA's own donation page, with nothing added to the address", ()
   assert.equal(new URL(settings.AID_URL).search, '', 'no amount or anything else in it: the tally stays in the browser');
   assert.equal(settings.aidLink('http://example.com'), null);
 });
+
+test('Report a problem: an email to Read Free with what happened, the outlet and the versions; no address', () => {
+  const report = settings.reportLink({ outlet: 'The New York Times', what: 'archive.today wants a CAPTCHA.', version: '0.24.0', browser: 'Chrome 157' });
+  assert.equal(report.address, 'hello@readfree.xyz');
+  assert.match(report.href, /^mailto:hello@readfree\.xyz\?subject=/);
+  const mail = new URLSearchParams(report.href.slice(report.href.indexOf('?') + 1));
+  assert.equal(mail.get('subject'), 'Read Free 0.24.0: a problem on The New York Times');
+  assert.equal(mail.get('body'), [
+    'What happened: archive.today wants a CAPTCHA.',
+    'Outlet: The New York Times',
+    'Read Free 0.24.0 in Chrome 157',
+    '',
+    "Anything else? If you'd like us to look at the article itself, paste its address here.",
+    '',
+  ].join('\r\n'));
+  assert.doesNotMatch(report.href, /https?%3A/i, 'no web address in it');
+  // From the menu on a page that isn't an outlet's: no outlet line
+  const plain = new URLSearchParams(settings.reportLink({ what: 'Read Free works on news sites.', version: '0.24.0' }).href.split('?')[1]);
+  assert.equal(plain.get('subject'), 'Read Free 0.24.0: a problem');
+  assert.ok(!plain.get('body').includes('Outlet:'));
+});
+
+test('the browser, for a report: its name and major version only', () => {
+  assert.equal(settings.browserName('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36'), 'Chrome 157');
+  assert.equal(settings.browserName('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0'), 'Edge 157');
+  assert.equal(settings.browserName('something else'), '');
+  assert.equal(settings.browserName(), '');
+});

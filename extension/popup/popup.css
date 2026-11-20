@@ -60,3 +60,8 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .donate { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--nf-support-bg); color: var(--nf-support-text); font-weight: 600; text-decoration: none; }
 .donate:hover { color: var(--nf-support-text); text-decoration: underline; text-underline-offset: 2px; }
 .donate-icon { width: 14px; height: 14px; background: var(--nf-donate-icon) center / contain no-repeat; }
+/* Report a problem: below the footer, small */
+.report { margin: 0; padding: 0 16px 12px; color: var(--nf-muted); font-size: 12px; }
+.report a { color: var(--nf-accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.report a:hover { color: var(--nf-accent-hover); }
+.report-to { user-select: all; }

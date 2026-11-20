@@ -97,7 +97,33 @@
     return /^https:\/\//i.test(url) ? { name: 'UNRWA', href: url } : null;
   }
 
-  const settings = { KEY, DEFAULTS, TIP_URL, DONATIONS_URLS, RELEASE_URLS, GIVE_PAGE, AID_URL, normalize, load, save, isOn, setSite, onChange, tipLink, aidLink };
+  // "Report a problem": an email to Read Free that the reader writes and sends themself, from
+  // the error banner on an article and from the toolbar menu. Filled in with the outlet, what
+  // happened, and the versions of Read Free and the browser. Never the article's address: the
+  // email asks the reader to paste it if they want that page looked at. Nothing is sent by
+  // Read Free itself.
+  const REPORT_TO = 'hello@readfree.xyz';
+
+  // "Chrome 157" from a user agent string, or '' (Edge says so; Dia, Brave and others say Chrome).
+  function browserName(userAgent = '') {
+    const edge = /\bEdg\/(\d+)/.exec(userAgent);
+    if (edge) return `Edge ${edge[1]}`;
+    const chrome = /\bChrome\/(\d+)/.exec(userAgent);
+    return chrome ? `Chrome ${chrome[1]}` : '';
+  }
+
+  function reportLink({ outlet = '', what = '', version = '', browser = '' } = {}) {
+    const subject = `Read Free ${version}: a problem${outlet ? ` on ${outlet}` : ''}`.replace(/\s+/g, ' ');
+    const lines = [];
+    if (what) lines.push(`What happened: ${what}`);
+    if (outlet) lines.push(`Outlet: ${outlet}`);
+    lines.push(`Read Free ${version}${browser ? ` in ${browser}` : ''}`);
+    lines.push('', "Anything else? If you'd like us to look at the article itself, paste its address here.", '');
+    const query = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\r\n'))}`;
+    return { address: REPORT_TO, href: `mailto:${REPORT_TO}?${query}` };
+  }
+
+  const settings = { KEY, DEFAULTS, TIP_URL, DONATIONS_URLS, RELEASE_URLS, GIVE_PAGE, AID_URL, REPORT_TO, normalize, load, save, isOn, setSite, onChange, tipLink, aidLink, browserName, reportLink };
   root.NYTFix = Object.assign(root.NYTFix || {}, { settings });
   if (typeof module === 'object' && module.exports) module.exports = settings;
 })(globalThis);

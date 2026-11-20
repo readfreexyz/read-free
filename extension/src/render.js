@@ -329,11 +329,15 @@
     const text = doc.createElement('span');
     text.textContent = message;
     banner.append(text);
-    for (const { text: label, href } of links) {
+    for (const { text: label, href, title } of links) {
       const a = doc.createElement('a');
       a.href = href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
+      // An email (Report a problem) opens the reader's mail app, not a tab
+      if (!/^mailto:/i.test(href)) {
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+      }
+      if (title) a.title = title;
       a.textContent = label;
       banner.append(a);
     }

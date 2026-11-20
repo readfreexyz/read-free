@@ -99,6 +99,11 @@
     $('site-host').textContent = view.sub && view.sub !== view.title ? view.sub : '';
     $('state').dataset.tone = view.tone;
     $('state-text').textContent = view.text;
+    // Report a problem: what the menu says about this page, the outlet and the versions; never
+    // the page's address (the email asks the reader to paste it if they want)
+    const report = settings.reportLink({ outlet: site?.name || '', what: view.text, version: chrome.runtime.getManifest().version, browser: settings.browserName(navigator.userAgent) });
+    $('report').href = report.href;
+    $('report-to').textContent = `\u00b7 ${report.address}`;
     const button = $('action');
     button.hidden = !view.action;
     if (view.action) {

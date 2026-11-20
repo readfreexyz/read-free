@@ -454,6 +454,17 @@ test('a CAPTCHA on /newest/ is reported at once; asking another way would hit it
     await waitFor(() => page.banner()?.dataset.kind === 'error');
     assert.match(page.banner().textContent, /CAPTCHA/);
     assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+    // Report a problem: an email the reader writes and sends, with what happened and the
+    // outlet, never the article's address; opened by the mail app, not in a tab
+    const report = [...page.banner().querySelectorAll('a')].find(a => a.textContent === 'Report a problem');
+    assert.ok(report, 'a Report a problem link');
+    assert.match(report.href, /^mailto:hello@readfree\.xyz\?subject=/);
+    const mail = new URLSearchParams(report.href.slice(report.href.indexOf('?') + 1));
+    assert.match(mail.get('subject'), /a problem on The New York Times$/);
+    assert.match(mail.get('body'), /^What happened: .*CAPTCHA/);
+    assert.ok(!mail.get('body').includes(ARTICLE) && !mail.get('body').includes('nytimes.com'), "no article address");
+    assert.equal(report.target, '', 'not in a new tab');
+    assert.equal(report.title, 'Email hello@readfree.xyz');
   } finally {
     page.close();
   }

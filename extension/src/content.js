@@ -567,7 +567,7 @@
       render.showBanner(document, site, {
         kind: 'error',
         message: `${which} incomplete too: the longest has ${best.chars.toLocaleString()} characters, and this page already shows ${live.chars.toLocaleString()}.`,
-        links: [{ text: 'View snapshot', href: best.snapshotUrl }],
+        links: [{ text: 'View snapshot', href: best.snapshotUrl }, reportLink(`${which} incomplete too.`)],
         actions: [tryAgain, dismiss],
       });
     } catch (e) {
@@ -580,7 +580,7 @@
       render.showBanner(document, site, {
         kind: 'error',
         message,
-        links: [{ text: 'Open on archive.today', href: archive.searchUrl(articleUrl, mirror) }],
+        links: [{ text: 'Open on archive.today', href: archive.searchUrl(articleUrl, mirror) }, reportLink(message)],
         actions: [tryAgain, dismiss],
       });
     } finally {
@@ -649,6 +649,12 @@
     status.why(notifyLib.reasonOptions(reason, site.shortName || site.name), { open: true });
     explainedHere = true;
     remember(notifyLib.explained(notifyState, site.id));
+  }
+  // "Report a problem" in an error banner (settings.reportLink): an email the reader writes and
+  // sends themself, with what happened, the outlet and the versions; never the article's address.
+  function reportLink(what) {
+    const report = settingsLib.reportLink({ outlet: site.name, what, version: chrome.runtime.getManifest?.().version || '', browser: settingsLib.browserName(navigator.userAgent) });
+    return { text: 'Report a problem', href: report.href, title: `Email ${report.address}` };
   }
   // The reader's tally as one sentence, for the donation link (src/tally.js), or null.
   function tallyText(months) {

@@ -142,6 +142,8 @@ Click the icon for the menu:
   articles from how many outlets (see [Your boycott](#your-boycott)). Below it, **Donate [that
   amount] to UNRWA**, and **Or give some to keep Read Free alive** (see [Donating](#donating)).
 - **Settings**, and **Support the project** when there's no tally yet to show it under.
+- **Report a problem**, at the bottom, with the address (hello@readfree.xyz): the same email as
+  the error banner's, with what the menu says about the page.
 - **Read Free [version] is out**, at the top, for a copy loaded by hand, once a release is a
   day old, with **Get it** (the site's update steps). Once a day, in the background, Read Free
   reads the release's version from its own site (`RELEASE_URLS`), and the menu does too when it
@@ -193,7 +195,10 @@ otherwise stops extension storage at 10 MB).
   extension starts over for that article.
 - **Problems:** a CAPTCHA, a timeout or a network error shows a red banner with a link to the
   article on archive.today and a **Try again** button (also on the note in the article). If
-  there's a CAPTCHA, complete it there first.
+  there's a CAPTCHA, complete it there first. **Report a problem** in the banner opens an email
+  to hello@readfree.xyz in your mail app, filled in with what happened, the outlet and the
+  versions; never the article's address (paste it if you want that page looked at). Nothing is
+  sent unless you send it.
 - **Photos:** snapshots keep only the one size the page loaded when it was captured. Where the
   site's image server can be asked for a bigger one (NYT's `-superJumbo` crops, FT's `width`
   parameter, The New Yorker's `w_2560`), 2x screens get that instead, falling back to the
@@ -280,6 +285,8 @@ in `extension/sites/`, plus a CSS file for anything that has to apply before the
 The content script picks the adapter for the current host. See
 [docs/multi-site-investigation.md](docs/multi-site-investigation.md) for other sites, and
 [docs/outlet-coverage.md](docs/outlet-coverage.md) for where each outlet on the list stands.
+[docs/monitoring.md](docs/monitoring.md) says how a change on an outlet's side gets noticed: a
+daily check on GitHub (`.github/workflows/site-health.yml`), and readers' reports.
 
 | Site | Status |
 | --- | --- |
