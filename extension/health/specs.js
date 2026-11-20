@@ -12,6 +12,9 @@
 //               page keeps none, like Spiegel+)
 //   paragraphs  what counts as a paragraph in live.body (default 'p')
 //   body: false   don't check live.body (FT's signed-out readers get a barrier page instead)
+//   feed        an RSS or Atom feed of the site's articles: samples for the archive.today check
+//               ('swap' sites) when the homepage refuses a script (as NYT, FT, The Atlantic and
+//               WSJ do; their feeds answer)
 //   markers.html     strings the page itself must contain
 //   markers.scripts  [{ name, src (RegExp for the script's address), texts }]
 (function (root) {
@@ -21,20 +24,20 @@
   const NINE_CLIENT = [{ name: "Nine's client", src: /\/hashed-metro-assets\/client\.[0-9a-f]+\.js/, texts: ['pianoContentWall', 'payWall', 'NO_PAYWALL'] }];
 
   const specs = {
-    nyt: { home: 'https://www.nytimes.com/', method: 'swap' },
-    ft: { home: 'https://www.ft.com/', method: 'swap', body: false, bodyNote: 'signed-out readers get a barrier page, no article body' },
-    atlantic: { home: 'https://www.theatlantic.com/', method: 'swap' },
+    nyt: { home: 'https://www.nytimes.com/', method: 'swap', feed: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml' },
+    ft: { home: 'https://www.ft.com/', method: 'swap', feed: 'https://www.ft.com/world?format=rss', body: false, bodyNote: 'signed-out readers get a barrier page, no article body' },
+    atlantic: { home: 'https://www.theatlantic.com/', method: 'swap', feed: 'https://www.theatlantic.com/feed/all/' },
     newyorker: { home: 'https://www.newyorker.com/', method: 'lift', minWords: 150 },
     cnn: { home: 'https://www.cnn.com/', method: 'lift', minWords: 150 },
     latimes: { home: 'https://www.latimes.com/', method: 'lift', minWords: 150 },
     newsweek: { home: 'https://www.newsweek.com/', method: 'lift', minWords: 150 },
     globeandmail: { home: 'https://www.theglobeandmail.com/', method: 'lift', minWords: 150 },
     thestar: { home: 'https://www.thestar.com/', method: 'lift', minWords: 150 },
-    wsj: { home: 'https://www.wsj.com/', method: 'swap' },
+    wsj: { home: 'https://www.wsj.com/', method: 'swap', feed: 'https://feeds.content.dowjones.io/public/rss/RSSWorldNews' },
     theage: { home: 'https://www.theage.com.au/', method: 'guard', minWords: 150, markers: { scripts: NINE_CLIENT } },
     smh: { home: 'https://www.smh.com.au/', method: 'guard', minWords: 150, markers: { scripts: NINE_CLIENT } },
-    spiegel: { home: 'https://www.spiegel.de/', method: 'swap', minBodyWords: 0 },
-    lemonde: { home: 'https://www.lemonde.fr/', method: 'swap' },
+    spiegel: { home: 'https://www.spiegel.de/', method: 'swap', feed: 'https://www.spiegel.de/schlagzeilen/index.rss', minBodyWords: 0 },
+    lemonde: { home: 'https://www.lemonde.fr/', method: 'swap', feed: 'https://www.lemonde.fr/rss/une.xml' },
     nationalpost: { home: 'https://nationalpost.com/', method: 'swap', minBodyWords: 10 },
     // The loader's event for the ad-blocker popup is in the page; the wall's event
     // (pno_abc_test:init) is in a chunk loaded later, so only its module's own guard is checked.

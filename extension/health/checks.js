@@ -16,8 +16,12 @@
   'use strict';
 
   const adapter = (root.NYTFix && root.NYTFix.adapter) || (typeof require === 'function' ? require('../src/adapter.js') : null);
+  const extractLib = (root.NYTFix && root.NYTFix.extract) || (typeof require === 'function' ? require('../src/extract.js') : null);
+  const archiveLib = (root.NYTFix && root.NYTFix.archive) || (typeof require === 'function' ? require('../src/archive.js') : null);
 
-  const BOT_TITLE = /just a moment|attention required|access denied|are you a robot|captcha|security check|verify you are human|pardon our interruption/i;
+  const BOT_TITLE = /just a moment|attention required|access denied|are you a robot|captcha|security check|verify you are human|pardon our interruption|client challenge/i;
+  // A tiny page that only asks for JavaScript (Le Monde's "Client Challenge", 3 KB, status 200)
+  const SCRIPT_ONLY = /enable javascript|javascript is (required|disabled)/i;
   const BLOCKED_STATUS = new Set([401, 402, 403, 405, 406, 429, 451, 503]); // 402: National Post's TollBit
   const MIN_LINKS_IF_SERVER_DRAWN = 30;
   // Pages with their own layout that share the article URL pattern: live blogs (the Herald's
@@ -34,6 +38,7 @@
     const title = page.doc && page.doc.title ? page.doc.title : '';
     const start = page.doc && page.doc.body ? page.doc.body.textContent.replace(/\s+/g, ' ').slice(0, 400) : '';
     if (BOT_TITLE.test(title) || (page.html.length < 30000 && BOT_TITLE.test(start))) return 'a bot check answered';
+    if (page.html.length < 8000 && SCRIPT_ONLY.test(page.html)) return 'a page that only asks for JavaScript, probably a bot check';
     return null;
   }
 
@@ -209,7 +214,71 @@
     return 'pass';
   }
 
-  const health = { unusable, checkHome, checkArticle, markerScripts, checkScript, combine, overall, splitSelectors };
+  // Sample articles from a site's RSS or Atom feed (specs: feed), for when its homepage refuses
+  // a script: its articles' addresses, without query or fragment, each once.
+  function feedSamples(site, xml) {
+    const urls = [...String(xml || '').matchAll(/<link>\s*(?:<!\[CDATA\[)?\s*(https:\/\/[^<\]\s]+)|<link[^>]*\shref="(https:\/\/[^"]+)"/g)].map(m => m[1] || m[2]);
+    const samples = [];
+    for (const raw of urls) {
+      let url;
+      try { url = new URL(raw.replace(/&amp;/g, '&')); } catch { continue; }
+      const clean = `${url.origin}${url.pathname}`;
+      if (onHosts(site, url.hostname) && site.isArticle(url.pathname) && !site.isLive(url.pathname) && !NOT_A_SAMPLE.test(url.pathname) && !samples.includes(clean)) samples.push(clean);
+    }
+    return samples;
+  }
+
+  // archive.today's newest snapshot of a sample article, run through the extension's own
+  // extractor (src/extract.js) with the site's snapshot rules: for the sites that swap the text
+  // in ('swap'). A changed snapshot layout, or an extractor that no longer finds the body, shows
+  // here. page: what get() gave for /newest/<article>, which redirects to the snapshot.
+  // A missing snapshot, a CAPTCHA or a capture with little text is a skip, not a failure: none
+  // of them is the extension's to fix.
+  const SNAPSHOT_MIN = Object.freeze({ paragraphs: 3, chars: 800 });
+  function checkSnapshot(site, page, articleUrl) {
+    const check = 'archive snapshot';
+    if (!page.ok) return result(check, 'skip', `archive.today didn't answer (${page.error})`);
+    if (page.status === 404) return result(check, 'skip', 'no snapshot of this article yet');
+    const blocked = archiveLib && archiveLib.looksBlocked(page.status, page.html);
+    if (blocked) return result(check, 'skip', `archive.today: ${blocked}`);
+    if (page.status !== 200 || !page.doc) return result(check, 'skip', `archive.today answered ${page.status}`);
+    const article = extractLib.extractArticle(page.doc, site, { baseUrl: page.url, articleUrl });
+    if (!article) return result(check, 'fail', `the extractor found no article body in the snapshot (snapshot.body: ${site.snapshot.body || 'auto'})`);
+    if (article.paragraphs < SNAPSHOT_MIN.paragraphs || article.chars < SNAPSHOT_MIN.chars) {
+      return result(check, 'skip', `the snapshot holds only ${article.paragraphs} paragraph(s), ${article.chars} characters: a capture behind the wall?`);
+    }
+    return result(check, 'pass', `${article.paragraphs} paragraphs, ${article.chars} characters extracted`);
+  }
+
+  // Run to run, for a daily check: which sites answered this run (a pass or a failure, rather
+  // than only skips) and since when they haven't. previous: what the last run kept, or {}.
+  // report: { id: { state } } from this run. today: 'YYYY-MM-DD'.
+  // Returns { state, alerts, blind, never }:
+  //   alerts  sites that failed, and sites that used to answer and haven't for BLIND_DAYS
+  //   blind   sites that stopped answering more recently (said, not alerted)
+  //   never   sites that have never answered this checker (said, not alerted: a host that
+  //           refuses scripts from where it runs)
+  const BLIND_DAYS = 7;
+  const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+  function track(previous, report, today) {
+    const sites = {};
+    const alerts = [], blind = [], never = [];
+    for (const [id, { state }] of Object.entries(report)) {
+      const was = (previous && previous.sites && previous.sites[id]) || {};
+      const answered = state === 'pass' || state === 'fail';
+      const now = answered
+        ? { lastAnswered: today, quietSince: null }
+        : { lastAnswered: was.lastAnswered || null, quietSince: was.quietSince || today };
+      sites[id] = now;
+      if (state === 'fail') alerts.push({ id, why: 'failed' });
+      else if (!answered && !now.lastAnswered) never.push(id);
+      else if (!answered && daysBetween(now.quietSince, today) >= BLIND_DAYS) alerts.push({ id, why: `couldn't be checked since ${now.quietSince}; it last answered on ${now.lastAnswered}` });
+      else if (!answered) blind.push({ id, since: now.quietSince });
+    }
+    return { state: { v: 1, at: today, sites }, alerts, blind, never };
+  }
+
+  const health = { unusable, checkHome, checkArticle, markerScripts, checkScript, combine, overall, splitSelectors, feedSamples, checkSnapshot, SNAPSHOT_MIN, track, BLIND_DAYS };
   root.NYTFix = Object.assign(root.NYTFix || {}, { health });
   if (typeof module === 'object' && module.exports) module.exports = health;
 })(globalThis);

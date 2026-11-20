@@ -1,0 +1,58 @@
+# The daily site health check (tools/site-health.mjs; docs/monitoring.md): each outlet's pages,
+# and for the outlets swapped in from archive.today, a snapshot run through the extension's own
+# extractor. The run fails, and GitHub sends an email about it, when an outlet failed (twice, a
+# minute apart) or when one that used to answer hasn't for a week. Outlets that refuse scripts
+# from GitHub's machines are listed on the run's page, never an alert.
+# What each run learned is kept for the next in the Actions cache (.health-state.json).
+# Run it by hand from the repository's Actions tab: "Fail on purpose" checks the email arrives.
+# GitHub pauses scheduled runs in a public repository after 60 days without a commit; any push,
+# or Enable workflow on the Actions tab, starts them again.
+name: Site health
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+    inputs:
+      fail_on_purpose:
+        description: Fail on purpose, to check that GitHub's email about a failed run arrives
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: What the last run kept
+        uses: actions/cache/restore@v4
+        with:
+          path: .health-state.json
+          key: site-health-state-${{ github.run_id }}
+          restore-keys: site-health-state-
+      - name: Check the outlets
+        run: node tools/site-health.mjs --samples 2 --state .health-state.json
+      - name: Keep it for the next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .health-state.json
+          key: site-health-state-${{ github.run_id }}
+      - name: Fail on purpose
+        if: ${{ inputs.fail_on_purpose }}
+        run: |
+          echo "Failing on purpose, to check that GitHub's email about a failed run arrives."
+          exit 1

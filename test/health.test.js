@@ -8,7 +8,7 @@ const nyt = require('../extension/sites/nyt.js');
 const corriere = require('../extension/sites/corriere.js');
 const [theage] = require('../extension/sites/nine.js');
 const spectator = require('../extension/sites/spectator.js');
-const { livePageHtml, corriereLivePageHtml, nineLivePageHtml, spectatorLivePageHtml } = require('./fixtures.js');
+const { livePageHtml, corriereLivePageHtml, nineLivePageHtml, spectatorLivePageHtml, snapshotHtml } = require('./fixtures.js');
 
 // A fetched page, as the runners hand it over.
 const page = (html, url, status = 200) => ({ ok: true, status, url, html, doc: new JSDOM(html, { url }).window.document });
@@ -130,4 +130,60 @@ test("checkHome: today's stories first, menu links (LA Times' 2022 hub pages) la
     'https://www.latimes.com/politics/story/2026-11-14/older',
     'https://www.latimes.com/lifestyle/image/story/2022-09-13/trend-analysis',
   ]);
+});
+
+test("unusable: Le Monde's \"Client Challenge\" and other pages that only ask for JavaScript are bot checks", () => {
+  const challenge = '<!doctype html><html><head><title>Client Challenge</title></head><body><noscript>Please enable JavaScript.</noscript></body></html>';
+  assert.match(health.unusable(page(challenge, 'https://www.lemonde.fr/x')), /bot check/);
+  const scriptOnly = '<!doctype html><html><head><title>Le Monde</title></head><body>You need to enable JavaScript to run this app.</body></html>';
+  assert.match(health.unusable(page(scriptOnly, 'https://www.lemonde.fr/x')), /only asks for JavaScript/);
+  assert.equal(health.unusable(page(livePageHtml(), 'https://www.nytimes.com/2026/01/01/x.html')), null, 'a real page');
+});
+
+test('feedSamples: the articles in an RSS or Atom feed, on the site, without query, each once', () => {
+  const rss = `<rss><channel><link>https://www.nytimes.com</link>
+    <item><link>https://www.nytimes.com/2026/11/19/world/asia/a.html?utm=rss</link></item>
+    <item><link><![CDATA[https://www.nytimes.com/2026/11/19/us/b.html]]></link></item>
+    <item><link>https://www.nytimes.com/2026/11/19/world/asia/a.html</link></item>
+    <item><link>https://www.nytimes.com/live/2026/11/19/us/c</link></item>
+    <item><link>https://elsewhere.example/2026/11/19/us/d.html</link></item></channel></rss>`;
+  assert.deepEqual(health.feedSamples(nyt, rss), ['https://www.nytimes.com/2026/11/19/world/asia/a.html', 'https://www.nytimes.com/2026/11/19/us/b.html']);
+  const atom = `<feed><link rel="alternate" href="https://www.nytimes.com/"/><entry><link rel="alternate" href="https://www.nytimes.com/2026/11/19/us/e.html"/></entry></feed>`;
+  assert.deepEqual(health.feedSamples(nyt, atom), ['https://www.nytimes.com/2026/11/19/us/e.html']);
+  assert.deepEqual(health.feedSamples(nyt, ''), []);
+});
+
+test("checkSnapshot: the extension's extractor on archive.today's snapshot; a missing snapshot, a CAPTCHA or a thin capture is a skip", () => {
+  const ARTICLE = 'https://www.nytimes.com/2026/01/01/world/x.html';
+  const SNAP = 'https://archive.ph/AbCdE';
+  const good = health.checkSnapshot(nyt, page(snapshotHtml(), SNAP), ARTICLE);
+  assert.equal(good.status, 'pass', good.detail);
+  assert.match(good.detail, /^12 paragraphs/);
+  assert.equal(health.checkSnapshot(nyt, page('<html><body>Not found</body></html>', SNAP, 404), ARTICLE).status, 'skip');
+  assert.match(health.checkSnapshot(nyt, page('<html><body><div class="g-recaptcha"></div></body></html>', SNAP), ARTICLE).detail, /captcha/);
+  assert.match(health.checkSnapshot(nyt, { ok: false, error: 'ECONNRESET' }, ARTICLE).detail, /didn't answer/);
+  const thin = health.checkSnapshot(nyt, page(snapshotHtml({ paragraphs: 2 }), SNAP), ARTICLE);
+  assert.equal(thin.status, 'skip', 'a capture behind the wall is not the extension\'s to fix');
+  const moved = health.checkSnapshot(nyt, page('<!doctype html><html><body><div id="CONTENT"><p>Menu</p></div></body></html>', SNAP), ARTICLE);
+  assert.equal(moved.status, 'fail', 'no article body where the adapter looks: the layout changed');
+});
+
+test("track: run to run, a failure alerts; a site that answered and then hasn't for a week alerts; one that never answered is only listed", () => {
+  const day = n => `2026-11-${String(n).padStart(2, '0')}`;
+  let t = health.track({}, { nyt: { state: 'skip' }, lemonde: { state: 'pass' }, wsj: { state: 'fail' } }, day(1));
+  assert.deepEqual(t.alerts, [{ id: 'wsj', why: 'failed' }]);
+  assert.deepEqual(t.never, ['nyt']);
+  assert.deepEqual(t.state.sites.lemonde, { lastAnswered: day(1), quietSince: null });
+  // Le Monde stops answering: quiet for six days, then an alert on the seventh
+  for (let n = 2; n <= 7; n++) {
+    t = health.track(t.state, { nyt: { state: 'skip' }, lemonde: { state: 'skip' }, wsj: { state: 'pass' } }, day(n));
+    assert.deepEqual(t.alerts, [], `day ${n}`);
+    assert.deepEqual(t.blind, [{ id: 'lemonde', since: day(2) }], `day ${n}`);
+  }
+  t = health.track(t.state, { nyt: { state: 'skip' }, lemonde: { state: 'skip' }, wsj: { state: 'pass' } }, day(9));
+  assert.deepEqual(t.alerts, [{ id: 'lemonde', why: `couldn't be checked since ${day(2)}; it last answered on ${day(1)}` }]);
+  assert.deepEqual(t.never, ['nyt'], 'never answered: listed, never an alert');
+  // It answers again: quiet no more
+  t = health.track(t.state, { nyt: { state: 'skip' }, lemonde: { state: 'pass' }, wsj: { state: 'pass' } }, day(10));
+  assert.deepEqual([t.alerts, t.blind], [[], []]);
 });
