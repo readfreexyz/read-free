@@ -26,7 +26,7 @@ it up to date, checking every hour ([docs/auto-update.md](docs/auto-update.md)).
 curl -fsSLO https://readfree.xyz/install.sh && sh install.sh
 ```
 
-Then, once, in Chrome (or Edge, Brave, Vivaldi):
+Then, once, in Chrome (or Edge, Brave, Vivaldi, Dia: in Dia the page is `dia://extensions`):
 
 1. Go to `chrome://extensions` and turn on **Developer mode** (top right). Leave it on: with it
    off, Chrome turns Read Free off when it updates itself.

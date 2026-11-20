@@ -131,6 +131,7 @@
     .shot .ui-arrow { fill: none; stroke: #444746; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
     .shot .ui-page { fill: #f8fafd; stroke: #c4c7c5; stroke-width: 1.5; }
     .shot .ui-small { font: 600 14px var(--font); fill: #1f1f1f; }
+    .browsers { margin: 0 0 14px; }
     .setup .aside { display: block; margin-top: 4px; color: var(--muted); font-size: 13.5px; }
     /* Filled in by Read Free itself, when it's installed in this browser */
     .installed { margin: 16px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 650; }
@@ -217,6 +218,8 @@
     <section aria-labelledby="load">
       <h2 id="load"><span class="number">2</span>Load it in Chrome, once</h2>
       <div class="card">
+        <p class="note browsers">Edge, Brave, Vivaldi and Dia work the same way (in Dia, the page is
+          <code class="path">dia://extensions</code>).</p>
         <ol class="setup">
           <li>Paste <code class="path">chrome://extensions</code> into the address bar and turn on
             <b>Developer mode</b>, top right. Leave it on: with it off, Chrome turns Read Free off.
