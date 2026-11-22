@@ -404,12 +404,26 @@
   const warnCache = e => console.warn('[Read Free] cache error', e);
 
   // Content scripts can't fetch archive.today cross-origin, so the service worker does it.
+  // The service worker can go away mid-request (Chrome restarts it; Read Free reloads for an
+  // update, or by hand): "the message channel closed before a response was received", or no
+  // answer at all. Asked again once, half a second later, a fresh one answers, and the newest
+  // snapshot still comes the quick way. A copy of Read Free that was itself replaced
+  // ("Extension context invalidated") can't be helped by asking again: the page needs a reload.
+  const BACKGROUND_WENT_AWAY = /message channel (is )?closed|receiving end does not exist|message port closed/i;
+  const BACKGROUND_RETRY_MS = 500;
   async function bgFetch(url, timeoutMs) {
     let res;
-    try {
-      res = await chrome.runtime.sendMessage({ type: 'nytfix:fetch', url, timeoutMs });
-    } catch (e) {
-      throw new FixError(`The extension's background worker didn't answer (${e.message}). Reload the page and try again.`);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        res = await chrome.runtime.sendMessage({ type: 'nytfix:fetch', url, timeoutMs });
+      } catch (e) {
+        if (attempt > 1 || !BACKGROUND_WENT_AWAY.test(e.message)) {
+          throw new FixError(`The extension's background worker didn't answer (${e.message}). Reload the page and try again.`);
+        }
+      }
+      if (res || attempt > 1) break;
+      console.info("[Read Free] the background worker didn't answer; asking it again");
+      await new Promise(resolve => setTimeout(resolve, BACKGROUND_RETRY_MS));
     }
     if (!res) throw new FixError("The extension's background worker didn't answer. Reload the page and try again.");
     const host = new URL(url).hostname;
@@ -494,7 +508,7 @@
         if (stale()) return;
         if (!(e instanceof FixError) || e.blocked) throw e;
         // The lookup or the snapshot didn't come through: the timemap is a second way in.
-        console.warn(`[Read Free] the newest snapshot didn't come through (${e.message}); asking for the list of snapshots instead`);
+        console.info(`[Read Free] the newest snapshot didn't come through (${e.message}); asking for the list of snapshots instead`);
       }
 
       // 2. The list of snapshots (the timemap): older ones when the newest was incomplete, or
@@ -515,7 +529,7 @@
       } catch (e) {
         if (stale() || !best) throw e;
         // With a snapshot in hand, offer it below rather than an error.
-        console.warn(`[Read Free] couldn't list older snapshots (${e.message})`);
+        console.info(`[Read Free] couldn't list older snapshots (${e.message})`);
       }
 
       // Newest first, skipping the one already fetched; at most MAX_ATTEMPTS in all.
@@ -572,7 +586,10 @@
       });
     } catch (e) {
       if (stale()) return;
-      console.warn('[Read Free]', e);
+      // Shown in the banner already; Chrome's Errors page is kept for real faults (an exception
+      // that isn't a FixError still says so there)
+      if (e instanceof FixError) console.info('[Read Free]', e.message);
+      else console.warn('[Read Free]', e);
       const message = e instanceof FixError ? e.message : `Something went wrong: ${e.message}`;
       status.finish('error', message);
       placeholder?.finish('error', `Couldn't load the rest of this article. ${message}`, { action: tryAgain });

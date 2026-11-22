@@ -115,7 +115,7 @@
 
     /* 2. Chrome's steps */
     .setup { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: setup; }
-    .setup li { position: relative; padding-left: 36px; counter-increment: setup; }
+    .setup li { position: relative; min-height: 24px; padding-left: 36px; counter-increment: setup; }
     /* Pictures of Chrome's controls (drawn, light like Chrome's own pages), the step's control ringed */
     .shot { display: block; width: 100%; max-width: 360px; height: auto; margin: 10px 0 2px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff; }
     .shot .ui-text { font: 500 16px var(--font); fill: #1f1f1f; }
@@ -131,10 +131,10 @@
     .shot .ui-arrow { fill: none; stroke: #444746; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
     .shot .ui-page { fill: #f8fafd; stroke: #c4c7c5; stroke-width: 1.5; }
     .shot .ui-small { font: 600 14px var(--font); fill: #1f1f1f; }
-    .browsers { margin: 0 0 14px; }
+    .card .browsers { margin: 0 0 14px; }
     .setup .aside { display: block; margin-top: 4px; color: var(--muted); font-size: 13.5px; }
     /* Filled in by Read Free itself, when it's installed in this browser */
-    .installed { margin: 16px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+    .card .installed { margin: 22px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 650; }
     .setup li::before { content: counter(setup); position: absolute; top: 1px; left: 0; display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 12px; font-weight: 700; }
 
     /* The outlets */

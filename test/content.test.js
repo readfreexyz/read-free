@@ -446,6 +446,39 @@ test('an incomplete newest snapshot is still shown when the list of older ones h
   }
 });
 
+// Chrome can restart the service worker, or Read Free reload, while a download is in flight:
+// "the message channel closed before a response was received". Asked again once, a fresh service
+// worker answers, and the newest snapshot still comes the quick way, not by the list of snapshots.
+test("the background worker goes away mid-request: asked again once, the newest snapshot still comes the quick way", async () => {
+  let asked = 0;
+  const newest = () => {
+    asked += 1;
+    if (asked === 1) throw new Error('A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received');
+    return { ...ok(COMPLETE), url: snapshotUrl(T[3]) };
+  };
+  const page = boot({ responses: { [newestUrl(ARTICLE)]: newest } });
+  try {
+    await waitFor(page.body);
+    assert.equal(asked, 2, 'asked twice');
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE)], 'no list of snapshots');
+    assert.equal(page.banner()?.dataset.kind === 'error', false);
+    assert.ok(page.logs.some(l => l.includes("the background worker didn't answer; asking it again")));
+  } finally {
+    page.close();
+  }
+});
+
+test("the background worker doesn't answer twice: the reader is told, as before", async () => {
+  const gone = () => { throw new Error('Could not establish connection. Receiving end does not exist.'); };
+  const page = boot({ responses: { [newestUrl(ARTICLE)]: gone, [timemapUrl(ARTICLE)]: gone } });
+  try {
+    await waitFor(() => page.banner()?.dataset.kind === 'error');
+    assert.match(page.banner().textContent, /background worker didn't answer/);
+  } finally {
+    page.close();
+  }
+});
+
 test('a CAPTCHA on /newest/ is reported at once; asking another way would hit it too', async () => {
   const page = boot({
     responses: { [newestUrl(ARTICLE)]: { ok: true, status: 200, url: newestUrl(ARTICLE), body: '<div class="g-recaptcha"></div>' } },
