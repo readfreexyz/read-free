@@ -37,10 +37,11 @@ Then, once, in Chrome (or Edge, Brave, Vivaldi, Dia: in Dia the page is `dia://e
 
 1. Go to `chrome://extensions` and turn on **Developer mode** (top right). Leave it on: with it
    off, Chrome turns Read Free off when it updates itself.
-2. Drag the folder onto that page: on a Mac the script opens it in Finder, selected (it's called
-   `extension`); Chrome loads a folder dropped there once Developer mode is on. Or click **Load
-   unpacked** and pick the folder the script printed: on a Mac, press Cmd+Shift+G in that window
-   and paste it (the script copies it).
+2. Drag the folder onto that page: the script opens it selected, in Finder on a Mac or File
+   Explorer on Windows (it's called `extension`); Chrome loads a folder dropped there once
+   Developer mode is on. Or click **Load unpacked** and pick the folder the script printed. The
+   script copies its path: on a Mac, press Cmd+Shift+G in that window and paste it; on Windows,
+   paste it into the Folder box and click Select Folder.
 3. Read Free's watermelon shows in the toolbar, next to the address bar. If it doesn't, click the
    puzzle piece there and pin **Read Free**.
 4. Reload any tabs that were already open.
