@@ -26,6 +26,13 @@ it up to date, checking every hour ([docs/auto-update.md](docs/auto-update.md)).
 curl -fsSLO https://readfree.xyz/install.sh && sh install.sh
 ```
 
+**On Windows**, the same in PowerShell (`website/install.ps1`): it keeps Read Free up to date
+with an hourly Task Scheduler task, "Read Free updater".
+
+```powershell
+irm https://readfree.xyz/install.ps1 -OutFile install.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+```
+
 Then, once, in Chrome (or Edge, Brave, Vivaldi, Dia: in Dia the page is `dia://extensions`):
 
 1. Go to `chrome://extensions` and turn on **Developer mode** (top right). Leave it on: with it
@@ -345,6 +352,7 @@ daily check on GitHub (`.github/workflows/site-health.yml`), and readers' report
 | `website/index.html` | The site's front page: the install command, the zip, the steps in Chrome and the outlets, and a note for visitors on a phone. `tools/release.sh build` writes the release in (see [docs/auto-update.md](docs/auto-update.md)). |
 | `website/og.png` | The picture apps show when the site's link is shared (the page's `og:image`). Drawn from `brand/og.svg`: `rsvg-convert -w 1200 -h 630 brand/og.svg -o website/og.png`. |
 | `website/install.sh` | Installs the newest signed release on macOS or Linux and updates it every hour (see [docs/auto-update.md](docs/auto-update.md)). |
+| `website/install.ps1` | The same for Windows, in Windows PowerShell 5.1: installs the newest signed release (checked by Windows' own OpenSSH) and updates it every hour from Task Scheduler. `tools/release.sh` writes install.sh's key and addresses into it; `.github/workflows/windows-installer.yml` runs it for real on a GitHub Windows machine (`test/windows/`). |
 | `tools/release.sh` | Makes the release signing key (`keygen`), and builds and signs a release into `dist/` (`build`). |
 | `tools/publish.sh` | Publishes `dist/` to the site (a Cloudflare Worker) and its mirror (GitHub Pages), then waits until both serve it (see [docs/auto-update.md](docs/auto-update.md)). |
 | `extension/ui/` | Shared by the menu and the settings page: `ui.css` (buttons, switches, the band), `theme.css` (the active theme's colors), `sites.js` (loads the adapters the manifest lists, and finds the one for a host). |

@@ -5,7 +5,8 @@
 #   tools/publish.sh [all | mirror | site]     all by default
 #
 # First it checks dist/ as an installed copy would: latest.txt's signature against the key in
-# dist/install.sh, the zip's name, size and SHA-256, index.html's fields all filled, _headers
+# dist/install.sh (install.ps1 with the same key and addresses), the zip's name, size and SHA-256,
+# index.html's fields all filled, _headers
 # there. It won't publish a version older than the one the site has. Then:
 #   mirror  the GitHub Pages repository: a clone of it (READFREE_MIRROR_REPO) with a git identity
 #           of its own, never the global one. Its files become dist/'s; committed in UTC, pushed.
@@ -55,6 +56,10 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
 SIGNER=$(setting SIGNER)
 URLS=$(setting RELEASE_URLS)
 [ -n "$SIGNER" ] && [ -n "$URLS" ] || die "$DIST/install.sh has no signing key or no addresses"
+# The Windows installer: the same key and addresses (tools/release.sh writes them in)
+[ -f "$DIST/install.ps1" ] || die "no install.ps1 in $DIST"
+grep -qxF "\$SIGNER = '$SIGNER'" "$DIST/install.ps1" && grep -qxF "\$RELEASE_URLS = '$URLS'" "$DIST/install.ps1" \
+  || die "$DIST/install.ps1 doesn't have install.sh's key and addresses"
 printf '%s\n' "$SIGNER" > "$TMP/allowed_signers"
 ssh-keygen -Y verify -f "$TMP/allowed_signers" -I "$PRINCIPAL" -n "$NAMESPACE" -s "$DIST/latest.txt.sig" \
   < "$DIST/latest.txt" > /dev/null 2>&1 || die "latest.txt's signature doesn't check out"

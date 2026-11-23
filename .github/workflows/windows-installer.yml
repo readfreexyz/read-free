@@ -1,0 +1,29 @@
+# The Windows installer (website/install.ps1), run for real: in Windows PowerShell 5.1 on a GitHub
+# Windows machine, against releases built and signed with a throwaway key and served from
+# localhost (test/windows/install-test.ps1). It runs when the installer or its test changes, and
+# by hand from the Actions tab. Nothing here touches Read Free's site or its key.
+name: Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - website/install.ps1
+      - test/windows/**
+      - .github/workflows/windows-installer.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install, update, refuse bad releases, and the hourly task, in Windows PowerShell 5.1
+        shell: powershell
+        run: ./test/windows/install-test.ps1

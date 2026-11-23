@@ -98,6 +98,14 @@ test('the install command: from the address the page is served from, if that is 
   }
 });
 
+test("the Windows command: from the page's address too, only when that's plain", () => {
+  const command = url => load(url).getElementById('command-win').textContent;
+  const at = site => `irm ${site}install.ps1 -OutFile install.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File .\\install.ps1`;
+  assert.equal(command('https://site.example/'), at('https://site.example/'));
+  assert.equal(command('https://mirror.example/read-free/'), at('https://mirror.example/read-free/'));
+  for (const url of ['http://mirror.example/', "https://mirror.example/a'b/", 'https://mirror.example/a$(x)/']) assert.equal(command(url), at('https://site.example/'), url);
+});
+
 test('Copy: shown only with a clipboard, and copies the command', async () => {
   assert.equal(load('https://mirror.example/').getElementById('copy').hidden, true);
   const copied = [];
@@ -108,5 +116,11 @@ test('Copy: shown only with a clipboard, and copies the command', async () => {
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.deepEqual(copied, [at('https://mirror.example/')]);
   assert.equal(copy.textContent, 'Copied');
+  // The Windows command's own Copy button
+  const copyWin = page.getElementById('copy-win');
+  assert.equal(copyWin.hidden, false);
+  copyWin.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.match(copied[1], /^irm https:\/\/mirror\.example\/install\.ps1 /);
   page.defaultView.close();
 });

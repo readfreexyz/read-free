@@ -23,6 +23,8 @@ REPO=${READFREE_REPO:-$ROOT}
 KEY=${READFREE_RELEASE_KEY:-"$HOME/.config/read-free/release-key"}
 DIST=${READFREE_DIST:-"$ROOT/dist"}
 INSTALLER=${READFREE_INSTALLER:-"$ROOT/website/install.sh"}
+# The Windows installer holds the same key and addresses (as $SIGNER and $RELEASE_URLS)
+PS_INSTALLER="$ROOT/website/install.ps1"
 NAMESPACE=read-free-release
 PRINCIPAL=read-free
 
@@ -43,6 +45,10 @@ keygen() {
   line="$PRINCIPAL namespaces=\"$NAMESPACE\" $1 $2"
   sed "s|^SIGNER=.*\$|SIGNER='$line'|" "$INSTALLER" > "$INSTALLER.tmp" && mv "$INSTALLER.tmp" "$INSTALLER"
   [ "$(signer)" = "$line" ] || die "couldn't write the key into $INSTALLER"
+  if [ -f "$PS_INSTALLER" ]; then
+    sed "s|^\\\$SIGNER = .*\$|\$SIGNER = '$line'|" "$PS_INSTALLER" > "$PS_INSTALLER.tmp" && mv "$PS_INSTALLER.tmp" "$PS_INSTALLER"
+    grep -qF "\$SIGNER = '$line'" "$PS_INSTALLER" || die "couldn't write the key into $PS_INSTALLER"
+  fi
   echo "key: $KEY (private: keep it, and its passphrase, safe)"
   echo "public half: in $INSTALLER; commit it"
 }
@@ -89,6 +95,13 @@ build() {
     name=$(basename "$f")
     case "$name" in
       install.sh) ;;
+      # The Windows installer, with the same key and addresses as install.sh
+      install.ps1)
+        urls=$(sed -n "s/^RELEASE_URLS='\(.*\)'\$/\1/p" "$INSTALLER" | head -n 1)
+        git -C "$REPO" show "HEAD:$f" | sed \
+          -e "s|^\\\$SIGNER = .*\$|\$SIGNER = '$line'|" -e "s|^\\\$RELEASE_URLS = .*\$|\$RELEASE_URLS = '$urls'|" > "$DIST/$name"
+        grep -qxF "\$SIGNER = '$line'" "$DIST/$name" && grep -qxF "\$RELEASE_URLS = '$urls'" "$DIST/$name" \
+          || die "couldn't write the key and addresses into install.ps1" ;;
       index.html)
         git -C "$REPO" show "HEAD:$f" | sed \
           -e "s|{{version}}|$version|g" -e "s|{{zip}}|$zipname|g" -e "s|{{size}}|$(( (size + 1023) / 1024 )) KB|g" \

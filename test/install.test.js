@@ -154,6 +154,10 @@ test('install, update, and refusing every bad release', { skip }, async t => {
     assert.ok(page.includes(`Version 1.0.0, released ${field('date').slice(0, 10)}`), 'the version and date');
     assert.ok(page.includes(`curl -fsSLO ${url}install.sh &amp;&amp; sh install.sh`), 'the install command');
     assert.ok(page.includes(field('sha256')), "the zip's SHA-256");
+    // The Windows installer, with this release's key and addresses written in
+    const ps1 = fs.readFileSync(path.join(dist, 'install.ps1'), 'utf8');
+    assert.ok(ps1.split('\n').includes(`$SIGNER = '${signer}'`), 'install.ps1: the release key');
+    assert.ok(ps1.split('\n').includes(`$RELEASE_URLS = '${url}'`), 'install.ps1: the addresses');
     publish();
     const res = sh('install', '--no-schedule');
     assert.equal(res.status, 0, res.stdout + res.stderr);
