@@ -169,6 +169,7 @@ try {
   Write-Host $r.Out
   Check ($r.Code -eq 0 -and $r.Out -match 'Developer mode' -and $r.Out -match 'Load unpacked') 'the site''s command: installs, and says what to do next'
   Check ($r.Out -match 'Drag the folder selected') 'the site''s command: opens Explorer on the folder, to drag'
+  Check ($r.Out -match 'These steps, with pictures, just opened in (Chrome|Edge)') 'the site''s command: opens the steps in a browser'
   $copied = try { Get-Clipboard } catch { "($($_.Exception.Message))" }
   Write-Host "clipboard: $copied"
   $task = Get-ScheduledTask -TaskName 'Read Free updater' -ErrorAction SilentlyContinue

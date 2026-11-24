@@ -117,7 +117,7 @@ const load = (url, clipboard) => new JSDOM(built, {
 }).window.document;
 const at = site => `curl -fsSLO ${site}install.sh && sh install.sh`;
 
-test("the visitor's own card first, across; the rest two by two; all of them there", () => {
+test("only what's for the visitor's browser and system is shown; the rest in a closed section, all of it there", () => {
   const AGENTS = {
     firefoxMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:160.0) Gecko/20100101 Firefox/160.0',
     firefoxWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0',
@@ -128,26 +128,54 @@ test("the visitor's own card first, across; the rest two by two; all of them the
     firefoxAndroid: 'Mozilla/5.0 (Android 15; Mobile; rv:160.0) Gecko/160.0 Firefox/160.0',
     iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Mobile/15E148 Safari/604.1',
   };
-  // Each card, with "+" when it goes across
+  const open = (page, agent, hash = '') => new JSDOM(page, {
+    url: `https://site.example/${hash}`, runScripts: agent ? 'dangerously' : undefined,
+    beforeParse(win) { if (agent) Object.defineProperty(win.navigator, 'userAgent', { value: agent }); },
+  }).window.document;
+  // Each card, with "+" when it goes across; those in the closed section in brackets
+  const names = cards => [...cards].map(c => c.id + (c.classList.contains('wide') ? '+' : '')).join(' ');
   const order = (page, agent) => {
-    const { window } = new JSDOM(page, {
-      url: 'https://site.example/', runScripts: agent ? 'dangerously' : undefined,
-      beforeParse(win) { if (agent) Object.defineProperty(win.navigator, 'userAgent', { value: agent }); },
-    });
-    return [...window.document.querySelectorAll('.ways > .card')].map(c => c.id + (c.classList.contains('wide') ? '+' : '')).join(' ');
+    const doc = open(page, agent);
+    const more = doc.querySelector('.ways > details');
+    if (more) assert.equal(more.open, false, 'closed');
+    return names(doc.querySelectorAll('main .ways:not(details .ways) > .card')) + (more ? ` (${names(more.querySelectorAll('.ways > .card'))})` : '');
   };
   const withIt = variant('chrome-only');
   const plain = 'mac windows firefox update';
-  assert.equal(order(withIt), plain, 'without the script: Firefox after Chrome, none of them across');
-  for (const agent of ['firefoxMac', 'firefoxWindows']) assert.equal(order(withIt, AGENTS[agent]), 'firefox+ mac windows update+', agent);
-  for (const agent of ['chromeMac', 'chromeLinux']) assert.equal(order(withIt, AGENTS[agent]), 'mac+ windows firefox update+', agent);
-  assert.equal(order(withIt, AGENTS.chromeWindows), 'windows+ mac firefox update+');
+  assert.equal(order(withIt), plain, 'without the script: everything shows, Firefox after Chrome');
+  for (const agent of ['firefoxMac', 'firefoxWindows']) assert.equal(order(withIt, AGENTS[agent]), 'firefox+ (mac windows update+)', agent);
+  for (const agent of ['chromeMac', 'chromeLinux']) assert.equal(order(withIt, AGENTS[agent]), 'mac+ update+ (windows firefox)', agent);
+  assert.equal(order(withIt, AGENTS.chromeWindows), 'windows+ update+ (mac firefox)');
   for (const agent of ['chromebook', 'firefoxAndroid', 'iphone']) assert.equal(order(withIt, AGENTS[agent]), plain, agent);
   // A release for Chrome alone
   const without = variant('firefox');
   assert.equal(order(without), 'mac windows update+');
-  assert.equal(order(without, AGENTS.firefoxMac), 'mac windows update+', 'no Firefox card to put first');
-  assert.equal(order(without, AGENTS.chromeWindows), 'windows+ mac+ update+', 'one left over goes across');
+  assert.equal(order(without, AGENTS.firefoxMac), 'mac windows update+', 'no Firefox card to show alone');
+  assert.equal(order(without, AGENTS.chromeWindows), 'windows+ update+ (mac+)');
+  // A link to a card opens the section it's in (the extension links to #update)
+  const isOpen = (agent, hash) => open(withIt, AGENTS[agent], hash).querySelector('.ways > details').open;
+  assert.equal(isOpen('firefoxMac', '#update'), true);
+  assert.equal(isOpen('chromeMac', '#firefox'), true);
+  assert.equal(isOpen('chromeMac', '#update'), false, 'shown already');
+  assert.equal(isOpen('chromeMac', '#load'), false);
+  // Step 2 is Chrome's: in Firefox it goes with Chrome's cards, and Firefox's own card keeps the
+  // line that says Read Free is installed
+  const step2 = d => d.getElementById('load').closest('section');
+  const firefox = open(withIt, AGENTS.firefoxMac);
+  assert.ok(step2(firefox).closest('details'), 'in the closed section');
+  assert.equal(firefox.getElementById('installed').closest('.card').id, 'firefox');
+  assert.equal(firefox.getElementById('installed').hidden, true, 'the extension shows it');
+  assert.equal(firefox.getElementById('chrome-step').hidden, true);
+  assert.equal(firefox.querySelector('#get .number').hidden, true, 'no lone 1');
+  assert.equal(isOpen('firefoxMac', '#load'), true);
+  for (const d of [open(withIt, AGENTS.chromeMac), open(withIt, AGENTS.iphone), open(withIt), open(without, AGENTS.firefoxMac)]) {
+    assert.equal(step2(d).closest('details'), null);
+    assert.ok(step2(d).contains(d.getElementById('installed')));
+    assert.equal(d.getElementById('chrome-step')?.hidden ?? false, false);
+  }
+  // The commands and Copy buttons work wherever their card is
+  const doc = open(withIt, AGENTS.chromeMac);
+  assert.ok(doc.querySelector('details #command-win') && doc.querySelector('#command'));
 });
 
 test('the install command: from the address the page is served from, if that is plain https', () => {
@@ -186,5 +214,12 @@ test('Copy: shown only with a clipboard, and copies the command', async () => {
   copyWin.click();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.match(copied[1], /^irm https:\/\/mirror\.example\/install\.ps1 /);
+  // The address of Chrome's own page: the same from a mirror
+  const copyExt = page.getElementById('copy-ext');
+  assert.equal(copyExt.hidden, false);
+  assert.equal(load('https://mirror.example/').getElementById('copy-ext').hidden, true);
+  copyExt.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(copied[2], 'chrome://extensions');
   page.defaultView.close();
 });
