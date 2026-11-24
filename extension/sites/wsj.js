@@ -9,6 +9,8 @@
 //   newest lookup can time out). The text is under div#__next, found automatically; reader
 //   comments sit apart (#comments_sector). The byline's "By" / "and" and the dateline are
 //   dropped.
+// - Not covered: cn.wsj.com and jp.wsj.com, the Chinese and Japanese editions. Their articles are
+//   cut the same way, and archive.today can't capture them (the user, 2026-11-24).
 (function (root) {
   'use strict';
 

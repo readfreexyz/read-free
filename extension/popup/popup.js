@@ -4,7 +4,7 @@
 // script ('nytfix:state').
 (async function () {
   'use strict';
-  const { settings, ui, popupView, notify, reasons, tally, release } = globalThis.NYTFix;
+  const { settings, ui, popupView, notify, reasons, tally, release, access } = globalThis.NYTFix;
   const sync = chrome.storage.sync;
   const $ = id => document.getElementById(id);
 
@@ -16,7 +16,8 @@
     $('donate-text').textContent = tip.text;
     $('donate').hidden = false;
   }
-  // A newer version is out (src/release.js): what's known at once, then a check at most daily
+  // A newer version is out (src/release.js): what's known at once, then a check at most daily.
+  // Not in Firefox, which updates Read Free by itself.
   const running = chrome.runtime.getManifest().version;
   const showNewer = record => {
     const newer = release.notice(record, running);
@@ -25,13 +26,19 @@
     $('newer-text').textContent = newer.text;
     $('newer').hidden = false;
   };
-  release.load(chrome.storage.local).then(showNewer);
-  release.refresh(chrome.storage.local).then(showNewer).catch(() => {});
+  if (!settings.isFirefox()) {
+    release.load(chrome.storage.local).then(showNewer);
+    release.refresh(chrome.storage.local).then(showNewer).catch(() => {});
+  }
 
-  $('settings').addEventListener('click', () => {
+  const openSettings = () => {
     chrome.runtime.openOptionsPage();
     window.close();
-  });
+  };
+  $('settings').addEventListener('click', openSettings);
+  // Firefox: addresses it hasn't let Read Free work on
+  $('access').addEventListener('click', openSettings);
+  access.missing(chrome).then(list => { $('access').hidden = list.length === 0; });
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   let url = null;

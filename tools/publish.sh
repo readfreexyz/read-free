@@ -7,7 +7,7 @@
 # First it checks dist/ as an installed copy would: latest.txt's signature against the key in
 # dist/install.sh (install.ps1 with the same key and addresses), the zip's name, size and SHA-256,
 # index.html's fields all filled, _headers
-# there. It won't publish a version older than the one the site has. Then:
+# there; and for Firefox, the signed file and updates.json in step with it, or neither of them. It won't publish a version older than the one the site has. Then:
 #   mirror  the GitHub Pages repository: a clone of it (READFREE_MIRROR_REPO) with a git identity
 #           of its own, never the global one. Its files become dist/'s; committed in UTC, pushed.
 #   site    the Cloudflare Worker that serves the site (READFREE_WORKER), deployed from dist/ with
@@ -72,13 +72,28 @@ ZIP=$(field zip)
 if grep -Eq '\{\{[a-z0-9]+\}\}' "$DIST/index.html"; then die "index.html has fields left unfilled"; fi
 [ -f "$DIST/_headers" ] || die "no _headers in $DIST: the site wouldn't send Access-Control-Allow-Origin"
 
+# Firefox: the file Mozilla signed, what updates.json says of it, and the page's link to it; or
+# none of the three (a release for Chrome alone)
+SITE=${URLS%% *}
+XPI="read-free-$VERSION.xpi"
+for f in "$DIST"/*.xpi; do if [ -f "$f" ] && [ "$f" != "$DIST/$XPI" ]; then die "$(basename "$f") in $DIST isn't this release's"; fi; done
+if [ -f "$DIST/$XPI" ]; then
+  [ -f "$DIST/updates.json" ] || die "no updates.json in $DIST: Firefox would never update"
+  unzip -Z1 "$DIST/$XPI" 2>/dev/null | grep -qxF META-INF/mozilla.rsa || die "$XPI isn't signed by Mozilla"
+  grep -qF "\"version\": \"$VERSION\"" "$DIST/updates.json" && grep -qF "\"update_link\": \"$SITE$XPI\"" "$DIST/updates.json" \
+    && grep -qF "\"update_hash\": \"sha256:$(sha256 "$DIST/$XPI")\"" "$DIST/updates.json" || die "updates.json doesn't describe $XPI"
+  grep -qF "href=\"$XPI\"" "$DIST/index.html" || die "index.html doesn't link to $XPI"
+else
+  [ ! -f "$DIST/updates.json" ] || die "updates.json in $DIST, without $XPI"
+  if grep -q '\.xpi' "$DIST/index.html"; then die "index.html links to a Firefox file that isn't in $DIST"; fi
+fi
+
 # What gets published: dist/'s files, without hidden ones (.DS_Store and the like)
 STAGE="$TMP/release"
 mkdir "$STAGE"
 for f in "$DIST"/*; do if [ -f "$f" ]; then cp "$f" "$STAGE/"; fi; done
 
 # Never back: an older version than the site's (the same one again is fine)
-SITE=${URLS%% *}
 if [ "${READFREE_VERIFY:-1}" != 0 ] && curl -fsS --proto '=https' --max-time 20 -o "$TMP/live.txt" "${SITE}latest.txt" 2>/dev/null; then
   live=$(sed -n 's/^version=//p' "$TMP/live.txt" | head -n 1)
   if [ -n "$live" ] && newer "$live" "$VERSION"; then die "$SITE has $live, newer than $VERSION"; fi
@@ -146,6 +161,14 @@ publish_site() {
   say "site: deployed to the Worker $WORKER"
 }
 
+# The address serves the Firefox file as one: with another type, Firefox downloads it instead of
+# offering to install it
+serves_xpi() {
+  [ -f "$DIST/$XPI" ] || return 0
+  curl -fsS --proto '=https' --max-time 60 -D "$TMP/xpi-headers" -o "$TMP/served.xpi" "$1$XPI?v=$(date +%s)" 2> /dev/null \
+    && cmp -s "$TMP/served.xpi" "$DIST/$XPI" && grep -iq '^content-type: application/x-xpinstall' "$TMP/xpi-headers"
+}
+
 # Every address serves this release, with the header; up to 5 minutes (GitHub Pages takes one
 # or two)
 verify() {
@@ -159,7 +182,7 @@ verify() {
     for url in $left; do
       if curl -fsS --proto '=https' --max-time 20 -D "$TMP/headers" -o "$TMP/served.txt" "${url}latest.txt?v=$(date +%s)" 2> /dev/null \
         && cmp -s "$TMP/served.txt" "$DIST/latest.txt" \
-        && grep -iq '^access-control-allow-origin: \*' "$TMP/headers"; then
+        && grep -iq '^access-control-allow-origin: \*' "$TMP/headers" && serves_xpi "$url"; then
         say "$url serves Read Free $VERSION"
       else
         still="$still $url"

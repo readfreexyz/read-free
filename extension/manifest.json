@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Read Free",
-  "version": "0.24.1",
+  "version": "0.25.0",
   "description": "Takes paywalls off news articles (NYT, FT, The Atlantic, CNN and more), filling in cut text from archive.today.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -42,7 +42,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.nytimes.com/*"
+        "https://www.nytimes.com/*",
+        "https://cooking.nytimes.com/*"
       ],
       "js": [
         "src/archive.js",
@@ -126,6 +127,16 @@
         "https://www.newyorker.com/*"
       ],
       "js": [
+        "page/newyorker.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.newyorker.com/*"
+      ],
+      "js": [
         "src/archive.js",
         "src/extract.js",
         "src/render.js",
@@ -151,7 +162,9 @@
     {
       "matches": [
         "https://www.cnn.com/*",
-        "https://edition.cnn.com/*"
+        "https://edition.cnn.com/*",
+        "https://us.cnn.com/*",
+        "https://cnnespanol.cnn.com/*"
       ],
       "js": [
         "src/archive.js",

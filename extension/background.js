@@ -11,17 +11,25 @@
 // - A newer version (src/release.js), for copies loaded by hand: checked once a day here (an
 //   alarm), from Read Free's own site only. While one is out, the toolbar icon carries an arrow,
 //   and content scripts ask here for it, so the status bar can say so (src/notify.js).
-importScripts('src/archive.js', 'src/settings.js');
-importScripts('src/update.js'); // reloads the extension when a newer version is on disk (docs/auto-update.md)
-importScripts('src/release.js');
+// - In Firefox this runs as a background page, which has no importScripts: the manifest that
+//   tools/firefox.mjs writes loads the same files first (background.scripts). Firefox updates
+//   the package it installed from Read Free's site by itself (docs/firefox.md), so there's no
+//   newer-version check or arrow there.
+if (typeof importScripts === 'function') {
+  importScripts('src/archive.js', 'src/settings.js');
+  importScripts('src/update.js'); // reloads the extension when a newer version is on disk (docs/auto-update.md)
+  importScripts('src/release.js', 'src/access.js');
+}
 
-const { archive, settings, release } = self.NYTFix;
+const { archive, settings, release, access } = self.NYTFix;
+const selfUpdating = settings.isFirefox();
 const NAME = 'Read Free';
 const ICON = { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png' };
 const ICON_OFF = { 16: 'icons/off-16.png', 32: 'icons/off-32.png' };
 // The badge's colors: the wall is off on this page; a newer version is out.
 const BADGE = { done: '#2e7d4f', newer: '#c2415b' };
 const NEWER_MARK = '↑';
+const ACCESS_MARK = '!'; // Firefox: addresses it hasn't let Read Free work on (src/access.js)
 // release.refresh() asks the site at most once a day (an hour after a failure); the alarm only
 // wakes it. Created once, so a service worker waking up doesn't restart its period.
 const RELEASE_ALARM = 'nytfix:release';
@@ -30,9 +38,13 @@ const ignore = () => {};
 const running = chrome.runtime.getManifest().version;
 let enabled = true;
 let newer = null; // release.notice(): { version, href, text } while a newer version is out
+let needsAccess = false; // Firefox: there are addresses to allow that the reader hasn't seen
 
 // The tooltip of a tab without its own
-const restingTitle = () => (!enabled ? `${NAME}: off on all sites` : newer ? `${NAME}: version ${newer.version} is out` : NAME);
+const restingTitle = () => (!enabled ? `${NAME}: off on all sites` : newer ? `${NAME}: version ${newer.version} is out` : needsAccess ? `${NAME}: new sites need your OK` : NAME);
+// What a tab without a ✓ shows: the arrow while a newer version is out (Chrome), the ! while
+// there are addresses to allow (Firefox), or nothing.
+const restingMark = () => (newer ? NEWER_MARK : needsAccess ? ACCESS_MARK : '');
 
 // On or off everywhere: the icon and its tooltip for every tab without its own.
 function showEnabled(on) {
@@ -44,20 +56,34 @@ function showEnabled(on) {
 // A newer version or not, from the saved release record: the arrow on every tab without a mark
 // of its own (a tab's ✓ wins while its wall is off).
 function showNewer(record) {
-  newer = release.notice(record, running);
-  if (newer) {
+  newer = selfUpdating ? null : release.notice(record, running);
+  showResting();
+}
+function showResting() {
+  if (restingMark()) {
     chrome.action.setBadgeBackgroundColor({ color: BADGE.newer }).catch(ignore);
     chrome.action.setBadgeTextColor?.({ color: '#ffffff' })?.catch(ignore);
   }
-  chrome.action.setBadgeText({ text: newer ? NEWER_MARK : '' }).catch(ignore);
+  chrome.action.setBadgeText({ text: restingMark() }).catch(ignore);
   chrome.action.setTitle({ title: restingTitle() }).catch(ignore);
 }
+// Firefox: are there addresses to allow? At start, and when the reader allows or turns off some,
+// or has seen them on the settings page.
+const checkAccess = async () => {
+  needsAccess = (await access.unseen(await access.missing(chrome), chrome.storage.local)).length > 0;
+  showResting();
+};
 const checkRelease = () => release.refresh(chrome.storage.local).then(showNewer).catch(ignore);
-const newerLoaded = release.load(chrome.storage.local).then(showNewer).catch(ignore);
-chrome.alarms?.onAlarm.addListener(alarm => { if (alarm.name === RELEASE_ALARM) checkRelease(); });
-Promise.resolve(chrome.alarms?.get(RELEASE_ALARM))
-  .then(alarm => alarm || chrome.alarms?.create(RELEASE_ALARM, { delayInMinutes: 1, periodInMinutes: RELEASE_ALARM_MINUTES }))
-  .catch(ignore);
+const newerLoaded = selfUpdating ? checkAccess().catch(ignore) : release.load(chrome.storage.local).then(showNewer).catch(ignore);
+if (selfUpdating) {
+  chrome.permissions?.onAdded?.addListener(() => { checkAccess().catch(ignore); });
+  chrome.permissions?.onRemoved?.addListener(() => { checkAccess().catch(ignore); });
+} else {
+  chrome.alarms?.onAlarm.addListener(alarm => { if (alarm.name === RELEASE_ALARM) checkRelease(); });
+  Promise.resolve(chrome.alarms?.get(RELEASE_ALARM))
+    .then(alarm => alarm || chrome.alarms?.create(RELEASE_ALARM, { delayInMinutes: 1, periodInMinutes: RELEASE_ALARM_MINUTES }))
+    .catch(ignore);
+}
 // The welcome page (welcome/), once: when Read Free is first loaded, never on an update or a
 // reload (Chrome says "update" for those), and never twice (a flag in chrome.storage.local, in
 // case a reload is ever reported as an install).
@@ -73,6 +99,7 @@ chrome.runtime.onInstalled?.addListener(({ reason }) => {
 // The menu checks too when it opens: follow its answer.
 chrome.storage.onChanged?.addListener((changes, area) => {
   if (area === 'local' && changes[release.KEY]) showNewer(changes[release.KEY].newValue);
+  if (area === 'local' && selfUpdating && changes[access.SEEN_KEY]) checkAccess().catch(ignore);
 });
 const syncEnabled = () => settings.load(chrome.storage.sync).then(p => showEnabled(p.enabled)).catch(ignore);
 // What a tab without a mark of its own shows (off everywhere, a newer version) is read from
@@ -98,6 +125,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // A content script asks whether a newer version is out (for the status bar), from the saved
   // record: no request to the site from an article page.
   if (msg?.type === 'nytfix:newer') {
+    if (selfUpdating) { sendResponse(null); return false; }
     release.load(chrome.storage.local).then(record => sendResponse(release.notice(record, running)), () => sendResponse(null));
     return true;
   }
@@ -112,8 +140,8 @@ function markTab(tabId, state, title) {
   const tooltip = title ? `${NAME}: ${title}` : restingTitle();
   // No ✓ on this tab: what every tab shows (the arrow while a newer version is out)
   const resting = () => {
-    if (newer) chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE.newer }).catch(ignore);
-    chrome.action.setBadgeText({ tabId, text: newer ? NEWER_MARK : '' }).catch(ignore);
+    if (restingMark()) chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE.newer }).catch(ignore);
+    chrome.action.setBadgeText({ tabId, text: restingMark() }).catch(ignore);
   };
   if (state === 'off') {
     chrome.action.setIcon({ tabId, path: ICON_OFF }).catch(ignore);

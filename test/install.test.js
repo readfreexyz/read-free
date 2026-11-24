@@ -88,7 +88,7 @@ test('install, update, and refusing every bad release', { skip }, async t => {
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/"version": "[^"]*"/, `"version": "${version}"`));
     git('add', '-A');
     git('commit', '-q', '-m', version);
-    run('sh', [path.join(ROOT, 'tools', 'release.sh'), 'build'], { env: { ...process.env, READFREE_REPO: repo, READFREE_DIST: dist, READFREE_RELEASE_KEY: key, READFREE_INSTALLER: script } });
+    run('sh', [path.join(ROOT, 'tools', 'release.sh'), 'build'], { env: { ...process.env, READFREE_FIREFOX: 'no', READFREE_REPO: repo, READFREE_DIST: dist, READFREE_RELEASE_KEY: key, READFREE_INSTALLER: script } });
     return { zip: `read-free-${version}.zip`, latest: fs.readFileSync(path.join(dist, 'latest.txt'), 'utf8') };
   };
   const publish = () => {
@@ -271,7 +271,7 @@ test('install, update, and refusing every bad release', { skip }, async t => {
   });
 
   await t.test('build: refuses without a release address, or with one that isn’t plain', () => {
-    const build = () => spawnSync('sh', [path.join(ROOT, 'tools', 'release.sh'), 'build'], { encoding: 'utf8', env: { ...process.env, READFREE_REPO: repo, READFREE_DIST: dist, READFREE_RELEASE_KEY: key, READFREE_INSTALLER: script } });
+    const build = () => spawnSync('sh', [path.join(ROOT, 'tools', 'release.sh'), 'build'], { encoding: 'utf8', env: { ...process.env, READFREE_FIREFOX: 'no', READFREE_REPO: repo, READFREE_DIST: dist, READFREE_RELEASE_KEY: key, READFREE_INSTALLER: script } });
     try {
       writeScript('', signer);
       assert.match(build().stderr, /no release address yet/);

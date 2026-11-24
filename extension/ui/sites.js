@@ -13,9 +13,11 @@
     return Object.values(sites).find(s => s.live && s.hosts.some(h => onHost(h, hostname))) || null;
   }
 
-  // The adapter files, in the manifest's order, each once.
+  // The adapter files, in the manifest's order, each once. Firefox's getManifest() gives them as
+  // whole addresses (moz-extension://<id>/sites/nyt.js), Chrome's as written (sites/nyt.js).
   function adapterFiles(manifest) {
-    const files = (manifest.content_scripts || []).flatMap(cs => cs.js || []).filter(f => /^sites\/[^/]+\.js$/.test(f));
+    const files = (manifest.content_scripts || []).flatMap(cs => cs.js || [])
+      .map(f => f.replace(/^[a-z-]+:\/\/[^/]+\//, '')).filter(f => /^sites\/[^/]+\.js$/.test(f));
     return [...new Set(files)];
   }
 

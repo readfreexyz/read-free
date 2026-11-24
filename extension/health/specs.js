@@ -27,7 +27,9 @@
     nyt: { home: 'https://www.nytimes.com/', method: 'swap', feed: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml' },
     ft: { home: 'https://www.ft.com/', method: 'swap', feed: 'https://www.ft.com/world?format=rss', body: false, bodyNote: 'signed-out readers get a barrier page, no article body' },
     atlantic: { home: 'https://www.theatlantic.com/', method: 'swap', feed: 'https://www.theatlantic.com/feed/all/' },
-    newyorker: { home: 'https://www.newyorker.com/', method: 'lift', minWords: 150 },
+    // The subscription engine that cuts the article (script#journey) and the sections it deletes.
+    // Its own script is at an address that changes, so only the page is checked.
+    newyorker: { home: 'https://www.newyorker.com/', method: 'guard', minWords: 150, markers: { html: ['id="journey"', 'data-journey-hook="grid-wrapper"'] } },
     cnn: { home: 'https://www.cnn.com/', method: 'lift', minWords: 150 },
     latimes: { home: 'https://www.latimes.com/', method: 'lift', minWords: 150 },
     newsweek: { home: 'https://www.newsweek.com/', method: 'lift', minWords: 150 },

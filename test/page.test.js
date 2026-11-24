@@ -177,3 +177,73 @@ test("piano-adblock: a true flag left by an earlier page is cleared before the s
   window.eval(PIANO_ADBLOCK);
   assert.match(window.document.cookie, /(?:^|;\s*)__adblocker=false\b/);
 });
+
+// The New Yorker's subscription engine, as read from its script on 2026-11-24: everything matching
+// a selector past the first is removed, again whenever something is added.
+const NEWYORKER = fs.readFileSync(path.join(__dirname, '../extension/page/newyorker.js'), 'utf8');
+const { newyorkerLivePageHtml } = require('./fixtures.js');
+const SELECTORS = ['[data-testid="ArticlePageChunks"] > *', '.body__inner-container > *'];
+
+function newyorkerPage({ guard = true } = {}) {
+  const { window } = new JSDOM(newyorkerLivePageHtml({ wall: false }), { url: 'https://www.newyorker.com/magazine/2026/11/30/test-story', runScripts: 'outside-only' });
+  window.console.info = () => {};
+  if (guard) window.eval(NEWYORKER);
+  const doc = window.document;
+  const truncate = () => {
+    for (const selector of SELECTORS) {
+      const cut = () => [...doc.querySelectorAll(selector)].forEach((el, i) => { if (i >= 1) el.remove(); });
+      cut();
+      new window.MutationObserver(records => { if (records.some(r => r.addedNodes.length)) cut(); }).observe(doc, { childList: true, subtree: true });
+    }
+  };
+  const send = action => doc.dispatchEvent(new window.CustomEvent(`nytfix:${action}`));
+  return { window, doc, truncate, send, text: () => doc.querySelectorAll('.body__inner-container p').length, held: () => doc.documentElement.getAttribute('data-nytfix-held') };
+}
+
+test("newyorker: without the guard, the engine leaves one paragraph (the test's premise)", () => {
+  const page = newyorkerPage({ guard: false });
+  page.truncate();
+  assert.equal(page.text(), 1);
+});
+
+test('newyorker: the article is kept, and said to be; ads go as the site likes; a whole page is left alone', () => {
+  const page = newyorkerPage();
+  assert.equal(page.held(), null);
+  page.truncate();
+  assert.equal(page.text(), 6);
+  assert.equal(page.held(), 'truncate');
+  assert.equal(page.doc.querySelector('.ad'), null, 'an ad row between the sections');
+
+  const free = newyorkerPage();
+  free.doc.querySelector('.ad').remove();
+  assert.equal(free.doc.querySelector('.ad'), null);
+  assert.equal(free.held(), null, 'an ad going is no wall');
+  // Elsewhere on the page, and by React's way (removeChild), nothing changes
+  free.doc.querySelector('header').remove();
+  assert.equal(free.doc.querySelector('header'), null);
+  const p = free.doc.querySelector('.body__inner-container p');
+  p.parentNode.removeChild(p);
+  assert.equal(free.text(), 5);
+  assert.equal(free.held(), null);
+});
+
+test("newyorker: release cuts the article as the site would; hold brings it all back, in order", () => {
+  const page = newyorkerPage();
+  const before = [...page.doc.querySelectorAll('.body__inner-container p')].map(p => p.textContent);
+  page.truncate();
+  page.send('release');
+  assert.equal(page.text(), 1, "the site's version");
+  assert.equal(page.held(), null);
+  page.send('hold');
+  assert.deepEqual([...page.doc.querySelectorAll('.body__inner-container p')].map(p => p.textContent), before);
+  assert.equal(page.held(), 'truncate');
+});
+
+test('newyorker: another page: what was held on the one before no longer counts', () => {
+  const page = newyorkerPage();
+  page.truncate();
+  const main = page.doc.querySelector('main');
+  main.parentNode.removeChild(main); // the site shows another page
+  page.send('hold');
+  assert.equal(page.held(), null);
+});

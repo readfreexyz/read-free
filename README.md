@@ -1,8 +1,9 @@
 # Read Free
 
 Read the news outlets boycotted over their coverage of Israel's genocide in Gaza, without paying
-them a cent. Read Free is a Chrome extension for your computer that gets you past their paywalls.
-The first time you read each one, it tells you why it's boycotted and links to the source.
+them a cent. Read Free is an extension for Chrome and Firefox on your computer that gets you past
+their paywalls. The first time you read each one, it tells you why it's boycotted and links to the
+source.
 
 Where a wall only covers text the page already has, it takes the wall off, with nothing fetched.
 Otherwise it puts in the text of the newest [archive.today](https://archive.ph) snapshot of the
@@ -15,9 +16,15 @@ Reuters, The Spectator, The Sydney Morning Herald, Toronto Star, USA Today and T
 Journal.
 
 For personal use only. It goes against the publishers' terms, and the Chrome Web Store doesn't
-allow paywall-bypass extensions, so it's loaded unpacked.
+allow paywall-bypass extensions, so in Chrome it's loaded unpacked. In Firefox it's signed by Mozilla,
+but not on its store.
 
 ## Install
+
+**In Firefox** (140 or later): **Add to Firefox** on [readfree.xyz](https://readfree.xyz). Firefox asks
+whether the site may install an add-on, then shows what Read Free may do. It updates by itself; when
+an update adds a site, the toolbar icon shows a `!`, and Settings has a button to allow it
+([docs/firefox.md](docs/firefox.md)). The rest of this section is for Chrome.
 
 **With the install script** (macOS and Linux): it installs the newest signed release and keeps
 it up to date, checking every hour ([docs/auto-update.md](docs/auto-update.md)).
@@ -298,13 +305,13 @@ daily check on GitHub (`.github/workflows/site-health.yml`), and readers' report
 
 | Site | Status |
 | --- | --- |
-| The New York Times | `sites/nyt.js`, `sites/nyt.css`: everything in this README |
+| The New York Times | `sites/nyt.js`, `sites/nyt.css`: everything in this README. NYT Cooking (cooking.nytimes.com) is part of it, with settings of its own: the page sends the whole recipe, and its wall clips it to 250px, makes it `inert` and draws a sign-up box. The clip and the box come off, with nothing fetched. If ingredients are missing, archive.today fills in (provisional). |
 | The Atlantic | `sites/atlantic.js`, `sites/atlantic.css`. Past the meter, the paywall service (Zephr) cuts the body to a few paragraphs, so the wall is detected from the cut: the article is marked paywalled in its structured data and the body holds under 600 words. CSS hides Zephr's gate slots; the archived text replaces the cut body. The gate itself hasn't been seen yet (ad blockers stop it), so this is provisional. |
-| The New Yorker | `sites/newyorker.js`, `sites/newyorker.css`. The full text is on the page: paragraphs past the free part have class `paywall`, and a paywall modal appears when the meter runs out. CSS hides the modal and shows those paragraphs, so no archive.today request is needed unless they're missing. Seen only inactive so far, so this is provisional. |
+| The New Yorker | `sites/newyorker.js`, `sites/newyorker.css`, `page/newyorker.js`. The page sends the whole article. Seconds in, Condé Nast's subscription engine puts an offer in it and deletes everything after the first paragraph, again whenever it's put back. The guard refuses those deletions, so the article is never cut; the offer is hidden, and nothing is fetched. If the text is cut all the same, archive.today fills in. The paywall modal (hidden too) hasn't been seen filled. |
 | Financial Times | `sites/ft.js`, `sites/ft.css`. FT shows non-subscribers a "barrier page" instead of the article: the headline plus offers, with no article text at all. `ft.css` trims it to the headline before first paint, and the archived article is inserted below the headline with a loading box while it loads. If archive.today can't help, FT's barrier page comes back. |
 | Los Angeles Times | `sites/latimes.js`. Seen past the meter: the page sends the whole article. On gated articles all but a few preview paragraphs sit in a hidden `div.subscriber-content.hidden` block, photos included, under a metering popup (`modality-custom-element[name=metering-modal]`) with scrolling locked (`body.met-panel-open`). The popup is hidden, the block shown and scrolling unlocked; nothing is fetched. Stories and newsletters. |
 | Toronto Star | `sites/thestar.js`. Sends every paragraph, hiding all but the first two in `.subscriber-only` blocks (`display: none`). They're shown, and the offers popup hidden. Built from the pages it sends; not yet checked in a browser. |
-| CNN, Newsweek, The Globe and Mail | `sites/cnn.js`, `sites/newsweek.js`, `sites/globeandmail.js`. They send the whole article too, but their walls (Piano on CNN and Newsweek, Zephr on the Globe) haven't been seen in action. So the check is general: a paid article with text cut short, locked scrolling or its end hidden, or (CNN, Newsweek) Piano's modal showing. With the text there, the wall comes off; if it was cut, archive.today fills in. Provisional. |
+| CNN, Newsweek, The Globe and Mail | `sites/cnn.js` (also us.cnn.com, edition.cnn.com and CNN en Español), `sites/newsweek.js`, `sites/globeandmail.js`. They send the whole article too, but their walls (Piano on CNN and Newsweek, Zephr on the Globe) haven't been seen in action. So the check is general: a paid article with text cut short, locked scrolling or its end hidden, or (CNN, Newsweek) Piano's modal showing. With the text there, the wall comes off; if it was cut, archive.today fills in. Provisional. |
 | The Wall Street Journal | `sites/wsj.js`. The page sends a few paragraphs, then Piano's wall: a snippet overlay (`[id^=cx-snippet]`) and an offer panel fixed at the bottom (`#cx-candybar`). Every Piano `cx-` element but the menu's subscribe button is hidden and the article swapped in from archive.today, without the byline's "By" / "and", the dateline and reader comments. WSJ's CSS hides the body's paragraphs after the second; it doesn't apply to the archived text (`data-nytfix-swapped` in `content.css`). archive.today's WSJ captures are sometimes empty shells; the error then says so. |
 | The Age, The Sydney Morning Herald | `sites/nine.js`, `page/nine.js` (one adapter, two sites, Nine's platform). The page sends the whole article; a second or two in, Piano fires a `pianoContentWall` event and Nine's own code cuts the body to two paragraphs and locks scrolling. `page/nine.js` runs in the page's own world before its scripts and holds that event back, so the article is never cut; Piano's subscribe box (`[id$=-piano-id]` slots, the "subscribe to comment" box too) is hidden and nothing is fetched. If the article gets cut anyway, it's swapped in from archive.today (the body: the div of unclassed `<p>`s, a level deeper in a wide window). |
 | Der Spiegel | `sites/spiegel.js`. A Spiegel+ article sends none of its text, only an offer block in its body (`[data-area=paywall]`). It's hidden and the archived article goes in, dressed in Spiegel's text wrapper (`live.textTemplate`). |
@@ -325,6 +332,7 @@ daily check on GitHub (`.github/workflows/site-health.yml`), and readers' report
 | --- | --- |
 | `extension/sites/*.js` | One adapter per site: URL rules, live-page selectors and wall signals, snapshot body and junk labels. |
 | `extension/sites/*.css` | Per-site CSS that keeps the site's walls from being drawn. |
+| `extension/src/access.js` | Firefox: the addresses it hasn't let Read Free work on (those an update adds), for Settings' **Allow** button, the toolbar menu and the icon's `!`. |
 | `extension/page/*.js` | Page-world guards: scripts that run in a site's own JavaScript world (`"world": "MAIN"`, at `document_start`, before its scripts) and keep the site's code from cutting an article it already sent. They mark `<html data-nytfix-held>` with what they held back, and answer `nytfix:release` (the reader asked for the site's version) and `nytfix:hold` events from the content script. |
 | `extension/src/adapter.js` | Shared pieces for adapters: `defineSite` (defaults and registration), the page's JSON-LD (paywall flag, article length), wall checks built on it (`cutBody`, `textOnPage`, `anyShown`), and what common paywall services (Piano, Zephr) put on the page. |
 | `extension/background.js` | Draws the toolbar icon: grey while the extension is off everywhere or on that tab's site, and a ✓ mark while a page's wall is off (the content script says when). Fetches pages for the content script, which can't make cross-site requests itself. Only `https` archive.today URLs are allowed. |

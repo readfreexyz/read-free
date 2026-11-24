@@ -16,3 +16,18 @@ html:not(.nytfix-off) [data-testid="vi-gateway-container"] {
   max-height: none !important;
   overflow: visible !important;
 }
+
+/* NYT Cooking: its script clips the recipe to 250px, and draws a sign-up box over it. */
+html:not(.nytfix-off) [class*="recipebody_body-container"][class*="truncator"] {
+  max-height: none !important;
+  overflow: visible !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+html:not(.nytfix-off) [class*="recipebody_body-container"][class*="truncator"]::before,
+html:not(.nytfix-off) [class*="recipebody_body-container"][class*="truncator"]::after {
+  background-image: none !important;
+}
+html:not(.nytfix-off) [class*="omacookingtruncator"] {
+  display: none !important;
+}

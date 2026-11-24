@@ -97,6 +97,17 @@ until tested.
     are on the page it only lifts the wall (`wall.type` → `'login'`, with its own message);
     otherwise it uses archive.today. `newyorker.css` hides the modal and forces `.paywall`
     paragraphs visible.
+  - **Replaced (2026-11-24):** the wall didn't come off, in Chrome or Firefox. The modal stays
+    empty; the wall is now an offer inside the article plus a cut. Traced in Firefox, signed out:
+    the page is whole (45 paragraphs) until about 6.6 s, when Condé Nast's "journey" engine
+    (`script#journey`) adds `[data-testid=BodyWrapper] > .journey-unit__container` and runs
+    `truncateMarkedContent` on `[class*="ArticlePageChunks-"] > *` and
+    `.body__inner-container > *`, keeping one of each: `element.remove()` on the rest, and again
+    from a MutationObserver whenever something is added. `live.keep` lost to that (five rounds in
+    3 ms). `page/newyorker.js` makes `remove()` do nothing on the article's sections and
+    paragraphs, and marks the page held; the adapter lifts and hides the offer. Checked on two
+    articles in Firefox 160 (45 and 90 paragraphs kept) and one in Chrome 157 (90, against 1
+    without Read Free). JSON-LD says `isAccessibleForFree: true` on walled articles.
 
 ### After first use (version 0.9.1)
 

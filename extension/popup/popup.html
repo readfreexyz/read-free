@@ -17,6 +17,9 @@
   <!-- A newer version, for those who loaded the folder by hand (src/release.js) -->
   <a class="newer" id="newer" target="_blank" rel="noopener noreferrer" hidden><span id="newer-text"></span><span class="newer-go">Get it &#x2197;</span></a>
 
+  <!-- Firefox: addresses it hasn't let Read Free work on (src/access.js); the settings page asks -->
+  <button type="button" class="newer" id="access" hidden><span>New sites need your OK</span><span class="newer-go">Allow &#x2197;</span></button>
+
   <section class="page" aria-live="polite">
     <div class="site">
       <span class="site-name" id="site-name"></span>
@@ -73,6 +76,7 @@
   <script src="../src/settings.js"></script>
   <script src="../src/update.js"></script>
   <script src="../src/release.js"></script>
+  <script src="../src/access.js"></script>
   <script src="../src/tally.js"></script>
   <script src="../src/notify.js"></script>
   <script src="../src/reasons.js"></script>

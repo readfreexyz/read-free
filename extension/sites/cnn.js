@@ -8,6 +8,9 @@
 //   scrolling, or the end of the text hidden.
 // - With the text all there, the wall just comes off. If CNN ever cuts it, archive.today fills
 //   in (2 of 2 samples archived, the body under [itemprop="articleBody"]).
+// - us.cnn.com and edition.cnn.com are the same site as www (the same articles at the same paths).
+//   cnnespanol.cnn.com is CNN en Español, on the same platform: two articles of each read on
+//   2026-11-24 had the same body, JSON-LD and whole text. cnn.com alone redirects to www.
 (function (root) {
   'use strict';
 
@@ -18,7 +21,12 @@
     id: 'cnn',
     name: 'CNN',
     shortName: 'CNN',
-    hosts: ['www.cnn.com', 'edition.cnn.com'],
+    hosts: ['www.cnn.com', 'edition.cnn.com', 'us.cnn.com', 'cnnespanol.cnn.com'],
+    // CNN en Español has its own articles; the rest are archived under www.
+    normalizeUrl: href => {
+      const { hostname, pathname } = new URL(href);
+      return `https://${hostname === 'cnnespanol.cnn.com' ? hostname : 'www.cnn.com'}${pathname}`;
+    },
     // Articles: /2026/11/13/us/new-orleans-tanker-crash (older ones end in /index.html).
     isArticle: path => /^\/\d{4}\/\d{2}\/\d{2}\/[a-z-]+\/[a-z0-9-]+(\/index\.html)?\/?$/.test(path),
     live: {

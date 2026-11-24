@@ -24,6 +24,7 @@ h2 { margin: 0 0 4px; font-size: 15px; font-weight: 650; }
 h2 label { cursor: default; }
 h2 .count { margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--nf-surface-2); color: var(--nf-muted); font-size: 12px; font-weight: 600; vertical-align: 1px; }
 .hint { margin: 0 0 12px; color: var(--nf-muted); }
+.access-row { display: flex; align-items: center; gap: 10px; margin: 0; }
 .row { display: flex; align-items: center; gap: 12px; }
 select { min-height: 32px; padding: 5px 10px; border: 1px solid var(--nf-line); border-radius: var(--nf-radius); background: var(--nf-surface); color: inherit; font: inherit; }
 .saved { color: var(--nf-ok); font-weight: 600; }

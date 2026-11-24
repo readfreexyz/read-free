@@ -3,7 +3,7 @@
 // with "I've donated" (shown only when settings.TIP_URL is set).
 (async function () {
   'use strict';
-  const { archive, settings, cache: articleCache, ui, notify, tally } = globalThis.NYTFix;
+  const { archive, settings, cache: articleCache, ui, notify, tally, access } = globalThis.NYTFix;
   const sync = chrome.storage.sync;
   const cache = articleCache.create(chrome.storage.local);
   const $ = id => document.getElementById(id);
@@ -15,6 +15,30 @@
   };
 
   $('version').textContent = `v${chrome.runtime.getManifest().version}`;
+
+  // Firefox: addresses it hasn't let Read Free work on. Asking has to be the first thing the click
+  // does, so they're looked up beforehand.
+  let toAllow = [];
+  async function showAccess() {
+    toAllow = await access.missing(chrome);
+    if (!toAllow.length) return;
+    const one = toAllow.length === 1;
+    $('access-text').textContent = `Firefox isn't letting Read Free work on ${access.names(toAllow)}. It doesn't ask about sites an update adds; or ${one ? 'it was' : 'they were'} turned off in Firefox's add-on settings.`;
+    $('access-allow').textContent = one ? 'Allow it' : 'Allow them';
+    $('access').hidden = false;
+    await access.see(toAllow, chrome.storage.local);
+  }
+  $('access-allow').addEventListener('click', () => {
+    chrome.permissions.request({ origins: toAllow }).then(async granted => {
+      if (!granted) return;
+      await showAccess();
+      if (toAllow.length) return;
+      $('access-allow').hidden = true;
+      $('access-status').textContent = 'Allowed. Reload any of their pages you have open.';
+    }).catch(e => { $('access-status').textContent = `Firefox said no: ${e.message}`; });
+  });
+  showAccess().catch(() => {});
+
   let prefs = await settings.load(sync);
 
   // Sites: one switch each, and one for all of them. Turned off everywhere, each site keeps its

@@ -22,6 +22,9 @@ test('adapterFiles: every sites/*.js the manifest loads, once each; siteForHost 
   assert.equal(new Set(files).size, files.length);
   assert.ok(files.includes('sites/nyt.js') && files.includes('sites/nine.js'));
   assert.ok(!files.some(f => f.startsWith('page/')), 'page-world guards are not adapters');
+  // As Firefox's getManifest() gives them
+  const firefox = { content_scripts: manifest.content_scripts.map(cs => ({ ...cs, js: cs.js.map(f => `moz-extension://98b3fa72-ba0c-41df-8c94-96f3ffef86f5/${f}`) })) };
+  assert.deepEqual(ui.adapterFiles(firefox), files);
   assert.equal(ui.siteForHost(sites, 'www.nytimes.com').id, 'nyt');
   assert.equal(ui.siteForHost(sites, 'www.smh.com.au').id, 'smh');
   assert.equal(ui.siteForHost(sites, 'milano.corriere.it').id, 'corriere', "'*.' hosts");

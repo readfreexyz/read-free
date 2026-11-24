@@ -5,6 +5,7 @@
   "description": "Chrome extension: swap a paywalled NYT article for the text of its newest archive.today snapshot.",
   "scripts": {
     "test": "node --test test/*.test.js",
+    "lint:firefox": "node tools/firefox.mjs && npx --yes web-ext@10.8.0 lint --self-hosted --source-dir build/firefox",
     "check": "node -e \"JSON.parse(require('fs').readFileSync('extension/manifest.json', 'utf8'))\" && for f in extension/*.js extension/src/*.js extension/options/*.js extension/popup/*.js extension/give/*.js extension/ui/*.js extension/welcome/*.js extension/health/*.js extension/page/*.js extension/sites/*.js; do node --check \"$f\" || exit 1; done"
   },
   "devDependencies": {

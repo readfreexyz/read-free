@@ -22,6 +22,14 @@
   </header>
 
   <main>
+    <!-- Firefox: addresses it hasn't let Read Free work on (src/access.js) -->
+    <section class="card access" id="access" hidden>
+      <h2>Allow new sites</h2>
+      <p class="hint" id="access-text"></p>
+      <p class="access-row"><button type="button" class="nf-button nf-primary" id="access-allow">Allow them</button>
+        <span class="status" id="access-status" role="status"></span></p>
+    </section>
+
     <section class="card tally" id="tally">
       <h2>Your boycott</h2>
       <p class="hint" id="tally-empty">Nothing counted yet. Each article Read Free opens for you is counted here.</p>
@@ -117,6 +125,7 @@
 
   <script src="../src/archive.js"></script>
   <script src="../src/settings.js"></script>
+  <script src="../src/access.js"></script>
   <script src="../src/cache.js"></script>
   <script src="../src/tally.js"></script>
   <script src="../src/notify.js"></script>

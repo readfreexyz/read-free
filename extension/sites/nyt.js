@@ -1,6 +1,17 @@
 // The New York Times. What the core needs to know about the site, from Phase 0 and the incognito
 // diagnostics (docs/phase0-findings.md). The wall-hiding CSS that has to apply before first paint
 // is in nyt.css.
+//
+// NYT Cooking (cooking.nytimes.com) is the same outlet, so it's the same site here (one switch, one
+// reason), with settings of its own on that address (siteFor). From the user's own browser, signed
+// out, 2026-11-24:
+// - The server sends the whole recipe, every time: the page as fetched has the recipe block
+//   ([class*=recipebody_body-container]) with nothing on it, and the page as drawn under the wall
+//   still held all 16 ingredients the JSON-LD gives, and every step.
+// - The wall is put on by script: the block gets `inert` and a class (recipebody_is-extended-
+//   truncator-fade…) that clips it to 250px (1,398 px of recipe), and a box
+//   (omacookingtruncatorregiwall_…) asks the reader to sign up. Nothing is deleted.
+// - So it only has to come off: the class names end in hashes, so selectors match their start.
 (function (root) {
   'use strict';
 
@@ -12,11 +23,11 @@
   const cutOff = doc => [...doc.querySelectorAll('section[name="articleBody"] a[href*="/subscription"]')]
     .some(a => { const line = a.closest('p, div'); return Boolean(line) && line.textContent.trim().length < 200; });
 
-  const site = {
+  const news = {
     id: 'nyt',
     name: 'The New York Times',
     shortName: 'NYT',
-    hosts: ['www.nytimes.com'],
+    hosts: ['www.nytimes.com', 'cooking.nytimes.com'],
 
     // Articles: /2026/11/14/world/europe/slug.html. Live blogs: /live/2026/11/13/us/slug.
     isArticle: path => /^\/\d{4}\/\d{2}\/\d{2}\/.+\.html$/.test(path),
@@ -61,7 +72,50 @@
     },
   };
 
+  // NYT Cooking's recipes
+  const RECIPE = '[class*="recipebody_body-container"]';
+  const INGREDIENT = `${RECIPE} [class*="ingredients_ingredients"] li`;
+  const STEP = `${RECIPE} [class*="preparation_stepList"] > li`;
+  // How many ingredients the JSON-LD's recipe has, or 0
+  const listed = doc => {
+    for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
+      let items;
+      try { items = [].concat(JSON.parse(script.textContent)); } catch { continue; }
+      const recipe = items.flatMap(i => (i && i['@graph']) || [i]).find(i => i && [].concat(i['@type']).includes('Recipe'));
+      if (recipe) return [].concat(recipe.recipeIngredient || []).length;
+    }
+    return 0;
+  };
+  const wholeRecipe = doc => doc.querySelector(STEP) !== null && doc.querySelectorAll(INGREDIENT).length >= Math.max(1, listed(doc));
+
+  const cooking = {
+    ...news,
+    isArticle: path => /^\/recipes\/\d+-[a-z0-9-]+\/?$/.test(path),
+    isLive: () => false,
+    normalizeUrl: href => `https://cooking.nytimes.com${new URL(href).pathname}`,
+    live: {
+      body: RECIPE,
+      story: 'main',
+      main: 'main',
+      upsellLink: null,
+      wall: {
+        popup: null,
+        detect: doc => doc.querySelector(`${RECIPE}[inert], ${RECIPE}[class*="truncator"]`) !== null,
+        type: doc => (wholeRecipe(doc) ? 'lift' : 'paywall'),
+        reveal: [RECIPE],
+        hide: ['[class*="omacookingtruncator"]'],
+        liftedMessage: "Removed NYT Cooking's wall. The whole recipe was already on the page.",
+        inert: null,
+        container: null,
+      },
+    },
+    snapshot: { body: ['auto'], skip: null, junk: null },
+  };
+
+  const siteFor = hostname => (hostname === 'cooking.nytimes.com' ? cooking : news);
+  const site = siteFor(root.location?.hostname);
+
   root.NYTFix = root.NYTFix || {};
   root.NYTFix.sites = Object.assign(root.NYTFix.sites || {}, { [site.id]: site });
-  if (typeof module === 'object' && module.exports) module.exports = site;
+  if (typeof module === 'object' && module.exports) module.exports = Object.assign(site, { siteFor });
 })(globalThis);

@@ -2,13 +2,26 @@
 // - Snapshots: main#main-content > article holds the header (skipped) and the body in div > div
 //   > div, with share buttons (role="button") and a video player region among the paragraphs.
 // - Live page: the body comes in several div.body__inner-container chunks with ads between
-//   them. The full text is on the page: paragraphs past the free part carry class "paywall",
-//   and an aside.paywall-modal pops up when the meter runs out. Seen only inactive so far (the
-//   modal empty and 0×0, full text present), so: newyorker.css hides the modal and shows any
-//   hidden .paywall paragraphs, and when those paragraphs are on the page that's all it takes,
-//   like NYT's login wall. If they're ever missing, archive.today fills in.
+//   them. The full text is in the page the server sends, wall or no wall: paragraphs past the
+//   free part carry class "paywall".
+// - The wall, seen 2026-11-24, signed out, on a first visit: 5 to 7 s after the page starts, Condé
+//   Nast's subscription engine (script#journey) puts an offer in the article
+//   ([data-testid=BodyWrapper] > .journey-unit__container: a subscription offer or a newsletter
+//   sign-up, class names ending in hashes) and deletes everything after the first paragraph
+//   (45 paragraphs down to 1), again and again if it's put back. aside.paywall-modal stays empty.
+//   page/newyorker.js refuses those deletions and says so (adapter.wallHeld), and the offer is
+//   hidden. JSON-LD is no help in telling a walled page: it says isAccessibleForFree: true, but
+//   it carries the whole text (articleBody), which tells a cut page from a whole one.
+// - The modal (aside.paywall-modal, two on the page, one for private windows) hasn't been seen
+//   filled; newyorker.css hides it and shows any hidden .paywall paragraphs.
+// - If the text is cut all the same, archive.today fills in.
 (function (root) {
   'use strict';
+
+  const adapter = root.NYTFix?.adapter || require('../src/adapter.js');
+  const BODY = 'div[data-testid="BodyWrapper"] .body__inner-container';
+  const OFFER = 'div[data-testid="BodyWrapper"] > .journey-unit__container';
+  const filled = (doc, selector) => [...doc.querySelectorAll(selector)].some(el => el.textContent.trim().length > 0);
 
   const site = {
     id: 'newyorker',
@@ -22,16 +35,20 @@
     normalizeUrl: href => `https://www.newyorker.com${new URL(href).pathname}`,
 
     live: {
-      body: 'div[data-testid="BodyWrapper"] .body__inner-container',
+      body: BODY,
       story: 'main#main-content article',
       main: 'main#main-content',
       upsellLink: null,
       wall: {
         popup: 'aside.paywall-modal',
-        // The modal is in every page, empty, until the meter runs out.
-        detect: doc => [...doc.querySelectorAll('aside.paywall-modal')].some(modal => modal.textContent.trim().length > 0),
+        // The guard held back the cut; or an offer is up in an article cut short; or the modal,
+        // in every page but empty, is filled. An offer alone is no wall: a newsletter sign-up can
+        // sit in an article that's whole.
+        detect: doc => adapter.wallHeld(doc) || filled(doc, 'aside.paywall-modal') ||
+          (filled(doc, OFFER) && adapter.wholeTextOnPage(doc, BODY) === false),
         // The paragraphs past the free part are still on the page: lifting is enough.
-        type: doc => (doc.querySelector('.body__inner-container .paywall') ? 'login' : 'paywall'),
+        type: doc => (adapter.wallHeld(doc) || doc.querySelector('.body__inner-container .paywall') ? 'lift' : 'paywall'),
+        hide: [OFFER],
         liftedMessage: 'Removed the paywall. The whole article was already on the page.',
         inert: null,
         container: null,

@@ -149,13 +149,16 @@ function newyorkerSnapshotHtml({ paragraphs = 10 } = {}) {
 // The New Yorker's live page, from the probe: the body in several div.body__inner-container
 // chunks with an ad between them; paragraphs past the free part have class "paywall"; an
 // aside.paywall-modal is filled when the meter runs out (wall). paywallParagraphs: false for a
-// page where those paragraphs aren't there.
-function newyorkerLivePageHtml({ wall = true, paywallParagraphs = true } = {}) {
+// page where those paragraphs aren't there. offer: the offer the subscription engine puts in the
+// article (2026-11-24). ld: the JSON-LD, which says the article is free and carries its text.
+function newyorkerLivePageHtml({ wall = true, paywallParagraphs = true, offer = '', ld = false } = {}) {
   const chunk = (from, n, cls) => `<div data-journey-hook="grid-wrapper" class="grid"><div class="grid--item">
     <div data-journey-hook="client-content" data-testid="BodyWrapper" class="body"><div class="body__inner-container">
       ${Array.from({ length: n }, (_, i) => `<p class="${cls}">New Yorker paragraph ${from + i}. ${LOREM}</p>`).join('')}
-    </div></div></div></div>`;
-  return `<!doctype html><html><head></head><body>
+    </div>${from === 1 && offer ? `<div class="journey-unit__container">${offer}</div>` : ''}</div></div></div>`;
+  const text = Array.from({ length: 6 }, (_, i) => `New Yorker paragraph ${i + 1}. ${LOREM}`).join(' ');
+  const head = ld ? `<script type="application/ld+json">${JSON.stringify({ '@type': 'NewsArticle', isAccessibleForFree: true, articleBody: text })}</script>` : '';
+  return `<!doctype html><html><head>${head}</head><body>
   <main id="main-content"><article><header><h1>Headline</h1></header>
     <div data-testid="ArticlePageChunks">
       ${chunk(1, 3, 'body')}
@@ -165,6 +168,27 @@ function newyorkerLivePageHtml({ wall = true, paywallParagraphs = true } = {}) {
   </article></main>
   <aside class="paywall-modal">${wall ? '<div><h2>Subscribe to keep reading</h2><a href="https://www.newyorker.com/subscribe">See the offers</a></div>' : ''}</aside>
 </body></html>`;
+}
+
+// A NYT Cooking recipe, from the structure the user's browser showed (2026-11-24, signed out): the
+// whole recipe in one block, which the wall makes inert and clips, and a sign-up box after it.
+// ingredients: how many are on the page, of the 16 the JSON-LD lists.
+function cookingLivePageHtml({ wall = true, ingredients = 16 } = {}) {
+  const li = n => Array.from({ length: n }, (_, i) => `<li><span>Ingredient ${i + 1}</span></li>`).join('');
+  const steps = Array.from({ length: 4 }, (_, i) => `<li class="preparation_step__nzZHP"><div class="preparation_stepContent__CFrQM"><p>Step ${i + 1}. ${LOREM}</p></div></li>`).join('');
+  const ld = { '@type': 'Recipe', isAccessibleForFree: false, recipeIngredient: Array.from({ length: 16 }, (_, i) => `Ingredient ${i + 1}`), recipeInstructions: [] };
+  return `<!doctype html><html><head><title>Recipe</title>
+  <script type="application/ld+json">${JSON.stringify(ld)}</script>
+  <style>.recipebody_is-extended-truncator-fade__raetB { max-height: 250px; overflow: hidden; }</style></head><body><div id="__next"><div>
+  <main><div class="pagegrid_container__ExzOM"><div class="recipe pagecontent_recipe-wrap__om4h5">
+    <div class="recipeintro_header-container__AsNGE"><h1>Recipe</h1></div>
+    <div class="recipebody_body-container__GfPut${wall ? ' recipebody_is-extended-truncator-fade__raetB' : ''}"${wall ? ' inert' : ''}>
+      <div class="recipebody_ingredients-block__OFg5G"><div class="ingredients_ingredients__FLjsC"><h2>Ingredients</h2><ul>${li(ingredients)}</ul></div></div>
+      <div class="recipebody_prep-block__FegRB"><div><div id="preparation_section"><h2>Preparation</h2><ol class="preparation_stepList___jqWa">${steps}</ol></div></div></div>
+    </div>
+  </div></div></main>
+  ${wall ? '<div class="omacookingtruncatorregiwall_extendedTruncatorFade__36L5o"><div style="height: 365px">Sign up to keep reading.</div></div>' : ''}
+  </div></div></body></html>`;
 }
 
 // The live NYT page, structured like the real one: real <p> tags with hashed classes inside
@@ -567,7 +591,7 @@ ${admiral ? '<div class="fEy1Z2XT" style="position: fixed; inset: 0; z-index: 21
 }
 
 module.exports = {
-  atlanticSnapshotHtml, atlanticLivePageHtml, newyorkerSnapshotHtml, newyorkerLivePageHtml, genericLivePageHtml, genericSnapshotHtml,
+  atlanticSnapshotHtml, atlanticLivePageHtml, newyorkerSnapshotHtml, newyorkerLivePageHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml,
   latimesLivePageHtml, thestarLivePageHtml, newsweekLivePageHtml, cnnLivePageHtml, globeLivePageHtml,
   nineLivePageHtml, nineSnapshotHtml, wsjLivePageHtml, wsjSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, lemondeLivePageHtml, lemondeSnapshotHtml,
   nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml,

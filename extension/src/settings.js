@@ -104,10 +104,20 @@
   // Read Free itself.
   const REPORT_TO = 'hello@readfree.xyz';
 
-  // "Chrome 157" from a user agent string, or '' (Edge says so; Dia, Brave and others say Chrome).
+  // Running in Firefox: the package tools/firefox.mjs makes, whose manifest has a
+  // browser_specific_settings.gecko block (Chrome's has none). Firefox updates it by itself
+  // from Read Free's site (docs/firefox.md).
+  function isFirefox(manifest = root.chrome?.runtime?.getManifest?.()) {
+    return Boolean(manifest?.browser_specific_settings?.gecko);
+  }
+
+  // "Chrome 157" or "Firefox 160" from a user agent string, or '' (Edge says so; Dia, Brave and
+  // others say Chrome).
   function browserName(userAgent = '') {
     const edge = /\bEdg\/(\d+)/.exec(userAgent);
     if (edge) return `Edge ${edge[1]}`;
+    const firefox = /\bFirefox\/(\d+)/.exec(userAgent);
+    if (firefox) return `Firefox ${firefox[1]}`;
     const chrome = /\bChrome\/(\d+)/.exec(userAgent);
     return chrome ? `Chrome ${chrome[1]}` : '';
   }
@@ -123,7 +133,7 @@
     return { address: REPORT_TO, href: `mailto:${REPORT_TO}?${query}` };
   }
 
-  const settings = { KEY, DEFAULTS, TIP_URL, DONATIONS_URLS, RELEASE_URLS, GIVE_PAGE, AID_URL, REPORT_TO, normalize, load, save, isOn, setSite, onChange, tipLink, aidLink, browserName, reportLink };
+  const settings = { KEY, DEFAULTS, TIP_URL, DONATIONS_URLS, RELEASE_URLS, GIVE_PAGE, AID_URL, REPORT_TO, normalize, load, save, isOn, setSite, onChange, tipLink, aidLink, isFirefox, browserName, reportLink };
   root.NYTFix = Object.assign(root.NYTFix || {}, { settings });
   if (typeof module === 'object' && module.exports) module.exports = settings;
 })(globalThis);

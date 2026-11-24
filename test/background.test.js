@@ -5,19 +5,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { memoryArea } = require('./fixtures.js');
+const { importedScripts } = require('../extension/src/update.js');
 
 const EXT = path.join(__dirname, '../extension');
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
 // local: chrome.storage.local (the release record, src/release.js). version: the running one.
-// fetch: answers for Read Free's site (latest.txt).
-function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); } } = {}) {
+// fetch: answers for Read Free's site (latest.txt). firefox: run as Firefox does, a background
+// page with no importScripts, given the same files first (tools/firefox.mjs), and a manifest with
+// Mozilla's settings. permissions: chrome.permissions, for Firefox (src/access.js).
+function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); }, firefox = false, permissions = null } = {}) {
   const calls = [];
   const listeners = { message: [], changed: [], alarm: [], installed: [] };
   const alarms = {};
   const record = name => async details => { calls.push([name, details]); };
   const chrome = {
-    runtime: { id: 'nytfix', onMessage: { addListener: fn => listeners.message.push(fn) }, onStartup: { addListener: () => {} }, getPlatformInfo: async () => ({}), getURL: p => `chrome-extension://nytfix/${p}`, getManifest: () => ({ version }), onInstalled: { addListener: fn => listeners.installed.push(fn) } },
+    runtime: { id: 'nytfix', onMessage: { addListener: fn => listeners.message.push(fn) }, onStartup: { addListener: () => {} }, getPlatformInfo: async () => ({}), getURL: p => `chrome-extension://nytfix/${p}`, getManifest: () => ({ version, host_permissions: ['https://archive.ph/*'], content_scripts: [{ matches: ['https://www.nytimes.com/*', 'https://cooking.nytimes.com/*'] }], ...(firefox ? { browser_specific_settings: { gecko: { id: 'read-free@readfree.xyz' } } } : {}) }), onInstalled: { addListener: fn => listeners.installed.push(fn) } },
     storage: { sync, local, onChanged: { addListener: fn => listeners.changed.push(fn) } },
     alarms: {
       get: async name => alarms[name],
@@ -32,11 +35,18 @@ function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0',
       setIcon: record('icon'),
     },
     tabs: { sendMessage: async () => ({}), create: record('tab') },
+    ...(permissions ? { permissions } : {}),
   };
   const context = vm.createContext({ chrome, console, setTimeout, clearTimeout, setInterval, clearInterval, URL, AbortController, fetch });
   context.self = context;
-  context.importScripts = (...files) => { for (const f of files) vm.runInContext(fs.readFileSync(path.join(EXT, f), 'utf8'), context); };
-  vm.runInContext(fs.readFileSync(path.join(EXT, 'background.js'), 'utf8'), context);
+  const run = f => vm.runInContext(fs.readFileSync(path.join(EXT, f), 'utf8'), context);
+  const source = fs.readFileSync(path.join(EXT, 'background.js'), 'utf8');
+  if (firefox) {
+    for (const f of [...importedScripts(source), 'background.js']) run(f);
+  } else {
+    context.importScripts = (...files) => files.forEach(run);
+    run('background.js');
+  }
   const send = (msg, sender, respond = () => {}) => listeners.message[0](msg, sender, respond);
   const changeSettings = value => { for (const fn of listeners.changed) fn({ settings: { newValue: value } }, 'sync'); };
   const changeLocal = (key, value) => { for (const fn of listeners.changed) fn({ [key]: { newValue: value } }, 'local'); };
@@ -159,6 +169,74 @@ test("the content script's question: what's known, from the saved record, nothin
   assert.equal(w.send({ type: 'nytfix:newer' }, { id: 'someone-else', tab: { id: 4 } }, a => other.push(a)), false);
   await settle();
   assert.deepEqual(other, []);
+});
+
+test('in Firefox: a background page given the same files; Firefox does the updating, so no check and no arrow', async () => {
+  const fetch = async () => assert.fail('fetched');
+  const local = memoryArea({ release: releaseRecord('0.22.0') });
+  const w = worker({ firefox: true, local, version: '0.21.0', fetch });
+  await settle();
+  assert.deepEqual(w.alarms, {}, 'no daily check');
+  assert.ok(!w.calls.some(([name, details]) => name === 'text' && details.text === '↑'), 'no arrow');
+  assert.equal(w.last('title').title, 'Read Free');
+  const answers = [];
+  w.send({ type: 'nytfix:newer' }, { id: 'nytfix', tab: { id: 4 } }, a => answers.push(a));
+  await settle();
+  assert.deepEqual(answers, [null], 'nothing for the status bar either');
+  w.changeLocal('release', releaseRecord('0.23.0'));
+  assert.ok(!w.calls.some(([name, details]) => name === 'text' && details.text === '↑'));
+  // The rest works as in Chrome
+  w.send({ type: 'nytfix:mark', state: 'lifted', title: "Removed Reuters's wall." }, { id: 'nytfix', tab: { id: 7 } });
+  await settle();
+  assert.deepEqual(w.last('text'), { tabId: 7, text: '✓' });
+});
+
+// chrome.permissions with these addresses off; allow() grants them all.
+function firefoxPermissions(off) {
+  const listeners = [];
+  return {
+    off: new Set(off),
+    contains: async function ({ origins }) { return origins.every(o => !this.off.has(o)); },
+    onAdded: { addListener: fn => listeners.push(fn) },
+    onRemoved: { addListener: fn => listeners.push(fn) },
+    allow() { this.off.clear(); listeners.forEach(fn => fn()); },
+  };
+}
+
+test('in Firefox: a ! while an address an update added is off, until the reader has seen it or allowed it', async () => {
+  const cooking = 'https://cooking.nytimes.com/*';
+  const permissions = firefoxPermissions([cooking]);
+  const w = worker({ firefox: true, permissions });
+  await settle();
+  assert.deepEqual(w.last('text'), { text: '!' });
+  assert.equal(w.last('title').title, 'Read Free: new sites need your OK');
+  // A tab's ✓ wins, and the ! comes back after it
+  w.send({ type: 'nytfix:mark', state: 'lifted', title: 'x' }, { id: 'nytfix', tab: { id: 7 } });
+  await settle();
+  assert.deepEqual(w.last('text'), { tabId: 7, text: '✓' });
+  w.send({ type: 'nytfix:mark', state: null }, { id: 'nytfix', tab: { id: 7 } });
+  await settle();
+  assert.deepEqual(w.last('text'), { tabId: 7, text: '!' });
+  permissions.allow();
+  await settle();
+  assert.deepEqual(w.last('text'), { text: '' });
+
+  const local = memoryArea();
+  const seen = worker({ firefox: true, permissions: firefoxPermissions([cooking]), local });
+  await settle();
+  assert.deepEqual(seen.last('text'), { text: '!' });
+  await local.set({ accessSeen: [cooking] });
+  seen.changeLocal('accessSeen', [cooking]);
+  await settle();
+  assert.deepEqual(seen.last('text'), { text: '' }, 'turned off on purpose: it stops asking');
+
+  const all = worker({ firefox: true, permissions: firefoxPermissions([]) });
+  await settle();
+  assert.deepEqual(all.last('text'), { text: '' });
+  // Chrome grants what the manifest asks
+  const chrome = worker({ permissions: firefoxPermissions([cooking]) });
+  await settle();
+  assert.deepEqual(chrome.last('text'), { text: '' });
 });
 
 test("a tab's ✓ cleared: back to the arrow; the menu's own check moves it too", async () => {

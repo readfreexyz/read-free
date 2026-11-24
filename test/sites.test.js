@@ -32,6 +32,21 @@ test('nyt: articles are dated .html pages; live blogs are /live/', () => {
   assert.equal(nyt.isLive('/2026/11/14/world/europe/student-protests.html'), false);
 });
 
+test('nyt: Cooking is the same outlet with settings of its own: recipes only, kept on its own address', () => {
+  const { cookingLivePageHtml } = require('./fixtures.js');
+  const cooking = nyt.siteFor('cooking.nytimes.com');
+  assert.equal(nyt.siteFor('www.nytimes.com'), nyt, 'the news settings everywhere else');
+  assert.equal(nyt.siteFor(undefined), nyt);
+  assert.deepEqual([cooking.id, cooking.name], ['nyt', 'The New York Times'], 'one switch, one reason');
+  assert.equal(cooking.isArticle('/recipes/793393632-fall-squash-galette'), true);
+  for (const path of ['/', '/recipes', '/68861692-nyt-cooking/296424-some-collection', '/2026/11/14/world/x.html']) assert.equal(cooking.isArticle(path), false, path);
+  assert.equal(nyt.isArticle('/recipes/793393632-fall-squash-galette'), false);
+  assert.equal(cooking.normalizeUrl('https://cooking.nytimes.com/recipes/1-x?ds_c=1#a'), 'https://cooking.nytimes.com/recipes/1-x');
+  assert.equal(paywall.wallType(parse(cookingLivePageHtml()), cooking), 'lift', 'the whole recipe is there');
+  assert.equal(paywall.wallType(parse(cookingLivePageHtml({ ingredients: 3 })), cooking), 'paywall', 'cut short of the 16 listed');
+  assert.equal(paywall.wallType(parse(cookingLivePageHtml({ wall: false })), cooking), null);
+});
+
 test('nyt: normalizeUrl drops query and fragment and forces www', () => {
   assert.equal(
     nyt.normalizeUrl('https://nytimes.com/2026/11/14/world/europe/x.html?smid=nytcore-ios-share&unlocked=1#comments'),
@@ -146,9 +161,25 @@ test('newyorker: snapshot body without the header, share buttons or video player
 });
 
 test('newyorker: a filled paywall modal is a wall; with the text still on the page, lifting is enough', () => {
-  assert.equal(paywall.wallType(parse(newyorkerLivePageHtml({ wall: true })), newyorker), 'login');
+  assert.equal(paywall.wallType(parse(newyorkerLivePageHtml({ wall: true })), newyorker), 'lift');
   assert.equal(paywall.wallType(parse(newyorkerLivePageHtml({ wall: true, paywallParagraphs: false })), newyorker), 'paywall');
   assert.equal(paywall.isActive(parse(newyorkerLivePageHtml({ wall: false })), newyorker), false, 'the empty modal on every page is no wall');
+});
+
+test('newyorker: an offer in the article is a wall when the text is cut or the guard held the cut; over a whole article it is none', () => {
+  const offer = '<div class="DualOfferInContentBarrierContainer-grPbkb"><p>Subscribe to keep reading.</p></div>';
+  const page = options => parse(newyorkerLivePageHtml({ wall: false, ld: true, ...options }));
+  // The engine's offer over a whole article (a newsletter sign-up), and no offer at all
+  assert.equal(paywall.wallType(page({ offer }), newyorker), null);
+  assert.equal(paywall.wallType(page({}), newyorker), null);
+  // page/newyorker.js kept the text: nothing to fetch
+  const held = page({ offer });
+  held.documentElement.setAttribute('data-nytfix-held', 'truncate');
+  assert.equal(paywall.wallType(held, newyorker), 'lift');
+  // Cut before the guard could help: archive.today
+  assert.equal(paywall.wallType(page({ offer, paywallParagraphs: false }), newyorker), 'paywall');
+  // Without the JSON-LD's text there's nothing to measure by
+  assert.equal(paywall.wallType(page({ offer, paywallParagraphs: false, ld: false }), newyorker), null);
 });
 
 // Sharper photos (snapshots keep only the one size the page loaded when it was captured)
@@ -215,6 +246,8 @@ test('batch 1: article URLs, and what is not one', () => {
     for (const path of yes) assert.equal(site.isArticle(path), true, `${site.id} ${path}`);
     for (const path of no) assert.equal(site.isArticle(path), false, `${site.id} ${path}`);
   }
+  assert.equal(cnn.normalizeUrl('https://us.cnn.com/2026/11/13/us/story'), 'https://www.cnn.com/2026/11/13/us/story');
+  assert.equal(cnn.normalizeUrl('https://cnnespanol.cnn.com/2026/11/23/mundo/historia-trax?x=1'), 'https://cnnespanol.cnn.com/2026/11/23/mundo/historia-trax', 'its own articles');
   assert.equal(cnn.normalizeUrl('https://edition.cnn.com/2026/11/13/us/story?iid=x'), 'https://www.cnn.com/2026/11/13/us/story');
 });
 
@@ -487,4 +520,22 @@ test('dailymail: a Mail+ article hidden by the site\'s CSS is a wall that comes 
 test('usatoday: a free story is no wall (the ad-blocker popup is handled by notices.js)', () => {
   const url = 'https://www.usatoday.com/story/news/politics/2026/11/15/x/92676928007/';
   assert.equal(paywall.isActive(pageAt(usatodayLivePageHtml(), url), usatoday), false);
+});
+
+test("every address the adapters name is in the manifest, and the other way round", () => {
+  const manifest = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '../extension/manifest.json'), 'utf8'));
+  const all = new Set();
+  for (const cs of manifest.content_scripts) {
+    const file = (cs.js || []).find(f => /^sites\//.test(f));
+    if (!file) continue;
+    require(`../extension/${file}`);
+    for (const match of cs.matches) all.add(match);
+  }
+  const sites = Object.values(globalThis.NYTFix.sites).filter(site => site.live);
+  const hosts = new Set(sites.flatMap(site => site.hosts).map(host => `https://${host}/*`));
+  // '*.corriere.it' takes in www.corriere.it, which the manifest needn't name
+  hosts.delete('https://www.corriere.it/*');
+  assert.deepEqual([...all].filter(m => !m.includes('example')).sort(), [...hosts].filter(h => !h.includes('example')).sort());
+  // A page-world guard runs on the same addresses as its adapter
+  for (const cs of manifest.content_scripts.filter(c => c.world === 'MAIN')) for (const match of cs.matches) assert.ok(all.has(match), match);
 });

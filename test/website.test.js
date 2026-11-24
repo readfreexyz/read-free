@@ -83,6 +83,30 @@ test('tools/release.sh fills each of its fields', () => {
   assert.deepEqual([...fields].sort(), [...filled].sort());
 });
 
+// As tools/release.sh makes it, with and without a Firefox file
+const variant = without => PAGE.split('\n').reduce(({ out, skip }, line) => {
+  if (line.includes(`<!-- ${without} -->`)) return { out, skip: true };
+  if (line.includes(`<!-- /${without} -->`)) return { out, skip: false };
+  return { out: skip || /^ *<!-- \/?(firefox|chrome-only) -->$/.test(line) ? out : [...out, line], skip };
+}, { out: [], skip: false }).out.join('\n');
+
+test('Firefox: a card with its file, and the words; or none of it in a release for Chrome alone', () => {
+  const words = d => d.querySelector('.lede').textContent.replace(/\s+/g, ' ');
+  const withIt = new JSDOM(variant('chrome-only')).window.document;
+  assert.equal(withIt.querySelector('#firefox a.download').getAttribute('href'), '{{xpi}}');
+  assert.match(words(withIt), /Read Free is an extension for Chrome and Firefox on your computer that gets you past/);
+  assert.match(withIt.querySelector('.phone').textContent.replace(/\s+/g, ' '), /works in Chrome or Firefox on a computer/);
+  const without = new JSDOM(variant('firefox')).window.document;
+  assert.equal(without.getElementById('firefox'), null);
+  assert.match(words(without), /Read Free is a Chrome extension for your computer that gets you past/);
+  assert.ok(!/firefox|xpi/i.test(without.documentElement.querySelector('body').textContent));
+  for (const d of [withIt, without]) {
+    assert.equal(d.querySelectorAll('meta[name="description"]').length, 1);
+    assert.equal(d.querySelector('meta[property="og:description"]').content, d.querySelector('meta[name="description"]').content);
+    assert.doesNotMatch(d.documentElement.innerHTML, /<!-- \/?(firefox|chrome-only) -->/);
+  }
+});
+
 // The page as built for https://site.example/
 const built = PAGE.replaceAll('{{site}}', 'https://site.example/').replace(/\{\{[a-z0-9]+\}\}/g, 'x');
 const load = (url, clipboard) => new JSDOM(built, {

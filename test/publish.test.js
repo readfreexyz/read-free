@@ -35,7 +35,7 @@ test('publish: checks the release, then the mirror and the site', { skip }, asyn
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'x');
   const dist = path.join(tmp, 'dist');
-  run('sh', [path.join(ROOT, 'tools', 'release.sh'), 'build'], { env: { ...process.env, READFREE_REPO: repo, READFREE_DIST: dist, READFREE_RELEASE_KEY: key, READFREE_INSTALLER: installer } });
+  run('sh', [path.join(ROOT, 'tools', 'release.sh'), 'build'], { env: { ...process.env, READFREE_FIREFOX: 'no', READFREE_REPO: repo, READFREE_DIST: dist, READFREE_RELEASE_KEY: key, READFREE_INSTALLER: installer } });
   const version = fs.readFileSync(path.join(dist, 'latest.txt'), 'utf8').match(/^version=(.*)$/m)[1];
   fs.writeFileSync(path.join(dist, '.DS_Store'), 'Finder was here');
 

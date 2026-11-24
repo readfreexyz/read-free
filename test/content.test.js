@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const manifest = require('../extension/manifest.json');
-const { livePageHtml, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
+const { livePageHtml, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
 const { VERSION: CACHE_VERSION } = require('../extension/src/cache.js');
 const archive = require('../extension/src/archive.js');
 
@@ -865,12 +865,70 @@ test("New Yorker: if the paywalled paragraphs aren't on the page, archive.today 
   }
 });
 
+test("New Yorker: the guard held the cut: the offer is hidden, the text stays, nothing is fetched", async () => {
+  const offer = '<div class="DualOfferInContentBarrierContainer-grPbkb">Subscribe to keep reading.</div>';
+  const page = boot({ url: NEWYORKER, html: newyorkerLivePageHtml({ wall: false, ld: true, offer }) });
+  try {
+    await sleep(200);
+    assert.equal(page.doc.getElementById('nytfix-status'), null, 'an offer over a whole article is no wall');
+    page.doc.documentElement.setAttribute('data-nytfix-held', 'truncate');
+    await waitFor(() => page.doc.documentElement.classList.contains('nytfix-active'));
+    assert.deepEqual(page.fetched, []);
+    assert.ok(page.doc.querySelector('.journey-unit__container').closest('[data-nytfix-hidden]'), 'the offer is hidden');
+    assert.equal(page.doc.querySelectorAll('.body__inner-container p').length, 6);
+    assert.match(statusText(page), /Removed the paywall/);
+  } finally {
+    page.close();
+  }
+});
+
 test('New Yorker: no modal, no wall, nothing happens', async () => {
   const page = boot({ url: NEWYORKER, html: newyorkerLivePageHtml({ wall: false }) });
   try {
     await sleep(300);
     assert.deepEqual(page.fetched, []);
     assert.equal(page.doc.getElementById('nytfix-status'), null);
+  } finally {
+    page.close();
+  }
+});
+
+// NYT Cooking: the recipe is on the page, clipped and inert
+
+const RECIPE = 'https://cooking.nytimes.com/recipes/793393632-test-recipe';
+
+test('NYT Cooking: the recipe is let go and the sign-up box hidden, nothing fetched; again if the wall comes back', async () => {
+  const page = boot({ url: RECIPE, html: cookingLivePageHtml() });
+  const { doc } = page;
+  try {
+    await waitFor(() => doc.documentElement.classList.contains('nytfix-active'));
+    const recipe = doc.querySelector('[class*="recipebody_body-container"]');
+    const box = doc.querySelector('[class*="omacookingtruncator"]');
+    assert.equal(recipe.hasAttribute('inert'), false);
+    assert.ok(recipe.hasAttribute('data-nytfix-reveal'), 'not clipped (content.css)');
+    assert.ok(box.hasAttribute('data-nytfix-hidden'));
+    assert.equal(doc.querySelectorAll('.ingredients_ingredients__FLjsC li').length, 16);
+    assert.deepEqual(page.fetched, []);
+    assert.match(statusText(page), /Removed NYT Cooking's wall/);
+    recipe.setAttribute('inert', '');
+    await waitFor(() => !recipe.hasAttribute('inert'));
+  } finally {
+    page.close();
+  }
+});
+
+test('NYT Cooking: a recipe without the wall, and a wall that comes up later', async () => {
+  const page = boot({ url: RECIPE, html: cookingLivePageHtml({ wall: false }) });
+  const { doc } = page;
+  try {
+    await sleep(300);
+    assert.equal(doc.getElementById('nytfix-status'), null);
+    const recipe = doc.querySelector('[class*="recipebody_body-container"]');
+    recipe.classList.add('recipebody_is-extended-truncator-fade__raetB');
+    recipe.setAttribute('inert', '');
+    await waitFor(() => doc.documentElement.classList.contains('nytfix-active'));
+    assert.equal(recipe.hasAttribute('inert'), false);
+    assert.deepEqual(page.fetched, []);
   } finally {
     page.close();
   }
