@@ -1,8 +1,8 @@
 # Read Free
 
-A Chrome extension that opens the paywalled articles of news outlets boycotted over their
-coverage of Israel's genocide in Gaza, so you can read them without paying them. The first time
-you read each outlet, it tells you why it's boycotted, with the source.
+Read the news outlets boycotted over their coverage of Israel's genocide in Gaza, without paying
+them a cent. Read Free is a Chrome extension for your computer that gets you past their paywalls.
+The first time you read each one, it tells you why it's boycotted and links to the source.
 
 Where a wall only covers text the page already has, it takes the wall off, with nothing fetched.
 Otherwise it puts in the text of the newest [archive.today](https://archive.ph) snapshot of the
