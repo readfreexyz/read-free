@@ -99,7 +99,8 @@ test('Firefox: a card with its file, and the words; or none of it in a release f
   const without = new JSDOM(variant('firefox')).window.document;
   assert.equal(without.getElementById('firefox'), null);
   assert.match(words(without), /Read Free is a Chrome extension for your computer that gets you past/);
-  assert.ok(!/firefox|xpi/i.test(without.documentElement.querySelector('body').textContent));
+  for (const script of without.querySelectorAll('script')) script.remove();
+  assert.ok(!/firefox|xpi/i.test(without.body.textContent));
   for (const d of [withIt, without]) {
     assert.equal(d.querySelectorAll('meta[name="description"]').length, 1);
     assert.equal(d.querySelector('meta[property="og:description"]').content, d.querySelector('meta[name="description"]').content);
@@ -115,6 +116,39 @@ const load = (url, clipboard) => new JSDOM(built, {
   beforeParse(window) { if (clipboard) Object.defineProperty(window.navigator, 'clipboard', { value: clipboard }); },
 }).window.document;
 const at = site => `curl -fsSLO ${site}install.sh && sh install.sh`;
+
+test("the visitor's own card first, across; the rest two by two; all of them there", () => {
+  const AGENTS = {
+    firefoxMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:160.0) Gecko/20100101 Firefox/160.0',
+    firefoxWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0',
+    chromeMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+    chromeWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+    chromeLinux: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+    chromebook: 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+    firefoxAndroid: 'Mozilla/5.0 (Android 15; Mobile; rv:160.0) Gecko/160.0 Firefox/160.0',
+    iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Mobile/15E148 Safari/604.1',
+  };
+  // Each card, with "+" when it goes across
+  const order = (page, agent) => {
+    const { window } = new JSDOM(page, {
+      url: 'https://site.example/', runScripts: agent ? 'dangerously' : undefined,
+      beforeParse(win) { if (agent) Object.defineProperty(win.navigator, 'userAgent', { value: agent }); },
+    });
+    return [...window.document.querySelectorAll('.ways > .card')].map(c => c.id + (c.classList.contains('wide') ? '+' : '')).join(' ');
+  };
+  const withIt = variant('chrome-only');
+  const plain = 'mac windows firefox update';
+  assert.equal(order(withIt), plain, 'without the script: Firefox after Chrome, none of them across');
+  for (const agent of ['firefoxMac', 'firefoxWindows']) assert.equal(order(withIt, AGENTS[agent]), 'firefox+ mac windows update+', agent);
+  for (const agent of ['chromeMac', 'chromeLinux']) assert.equal(order(withIt, AGENTS[agent]), 'mac+ windows firefox update+', agent);
+  assert.equal(order(withIt, AGENTS.chromeWindows), 'windows+ mac firefox update+');
+  for (const agent of ['chromebook', 'firefoxAndroid', 'iphone']) assert.equal(order(withIt, AGENTS[agent]), plain, agent);
+  // A release for Chrome alone
+  const without = variant('firefox');
+  assert.equal(order(without), 'mac windows update+');
+  assert.equal(order(without, AGENTS.firefoxMac), 'mac windows update+', 'no Firefox card to put first');
+  assert.equal(order(without, AGENTS.chromeWindows), 'windows+ mac+ update+', 'one left over goes across');
+});
 
 test('the install command: from the address the page is served from, if that is plain https', () => {
   const command = url => load(url).getElementById('command').textContent;
