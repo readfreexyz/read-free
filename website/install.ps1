@@ -320,8 +320,11 @@ function Set-Schedule {
 }
 
 # Opens the site's steps in a browser Read Free works in, one with a window open or else one that's
-# installed, and returns its name; '' without one.
+# installed, and returns its name; '' without one. Not from an administrator's window: a browser
+# started there would have administrator rights.
 function Open-Steps {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  if ((New-Object Security.Principal.WindowsPrincipal $identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { return '' }
   $steps = @($RELEASE_URLS -split '\s+' | Where-Object { $_ })[0] + '#load'
   if ($steps -notmatch '^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~-]+)*/#load$') { return '' }
   $browsers = @(@('chrome', 'Chrome'), @('msedge', 'Edge'), @('brave', 'Brave'), @('vivaldi', 'Vivaldi'))

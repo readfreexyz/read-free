@@ -169,7 +169,7 @@ try {
   Write-Host $r.Out
   Check ($r.Code -eq 0 -and $r.Out -match 'Developer mode' -and $r.Out -match 'Load unpacked') 'the site''s command: installs, and says what to do next'
   Check ($r.Out -match 'Drag the folder selected') 'the site''s command: opens Explorer on the folder, to drag'
-  Check ($r.Out -match 'These steps, with pictures, just opened in (Chrome|Edge)') 'the site''s command: opens the steps in a browser'
+  Check ($r.Out -notmatch 'These steps, with pictures') 'elevated, as everything is here: no browser started with administrator rights'
   $copied = try { Get-Clipboard } catch { "($($_.Exception.Message))" }
   Write-Host "clipboard: $copied"
   $task = Get-ScheduledTask -TaskName 'Read Free updater' -ErrorAction SilentlyContinue
@@ -205,25 +205,30 @@ try {
 
   # From a normal window: this machine runs everything elevated, so the install runs again as a
   # Basic User (runas /trustlevel), with Administrators turned off in its token. It keeps this
-  # environment, so the same temporary %LOCALAPPDATA%: up to date there, it sets up the task.
+  # environment, so the same temporary %LOCALAPPDATA%: up to date there, it sets up the task. It
+  # opens the site's steps in a browser too, so nothing here may wait for what it started:
+  # Start-Process -Wait does (it waited for Chrome until the job's time was up).
   $basic = Join-Path $tmp 'basic'
   New-Item -ItemType Directory -Path $basic | Out-Null
-  $line = "cmd.exe /c $ps -NoProfile -ExecutionPolicy Bypass -File $installer install no-window > $basic\out.txt 2>&1 & whoami /groups > $basic\groups.txt & echo done> $basic\done.txt"
-  $runas = Run 'runas.exe' "/trustlevel:0x20000 `"$line`""
+  $line = "cmd.exe /c $ps -NoProfile -ExecutionPolicy Bypass -File $installer install > $basic\out.txt 2>&1 & whoami /groups > $basic\groups.txt & echo done> $basic\done.txt"
+  $runas = Start-Process -FilePath 'runas.exe' -ArgumentList "/trustlevel:0x20000 `"$line`"" -NoNewWindow -PassThru
   for ($i = 0; $i -lt 90 -and -not (Test-Path "$basic\done.txt"); $i++) { Start-Sleep -Seconds 1 }
   if (Test-Path "$basic\done.txt") {
-    $out = [IO.File]::ReadAllText("$basic\out.txt")
+    $out = Get-Content -LiteralPath "$basic\out.txt" -Raw # shares the file: the browser may hold it open
     Write-Host $out
     $admins = @(Get-Content "$basic\groups.txt" | Where-Object { $_ -match 'BUILTIN\\Administrators' })
     Write-Host "as a Basic User: $($admins -join ' ')"
     Check ($admins.Count -eq 1 -and $admins[0] -match 'deny only') 'not elevated: Administrators is off in its token'
+    Check ($out -match 'These steps, with pictures, just opened in (Chrome|Edge)') 'not elevated: opens the steps in a browser'
+    Check ($out -match 'Drag the folder selected') 'not elevated: opens Explorer on the folder, to drag'
     Check ($out -match 'checks for updates at login and every hour' -and (Get-ScheduledTask -TaskName 'Read Free updater' -ErrorAction SilentlyContinue)) 'not elevated: the hourly task is set up'
     $r = Invoke-Installer $updater 'uninstall'
     Check (-not (Get-ScheduledTask -TaskName 'Read Free updater' -ErrorAction SilentlyContinue)) 'not elevated: uninstall takes its task away'
   } else {
-    Write-Host "couldn't run as a Basic User here (runas: exit $($runas.Code) $($runas.Out))"
+    Write-Host "couldn't run as a Basic User here (runas: $(if ($runas.HasExited) { "exit $($runas.ExitCode)" } else { 'still running' }))"
   }
 } finally {
+  Get-Process -Name chrome, msedge -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id -Force }
   Get-ChildItem Cert:\LocalMachine\Root, Cert:\LocalMachine\My | Where-Object { $_.Subject -eq 'CN=localhost' } | Remove-Item -ErrorAction SilentlyContinue
 }
