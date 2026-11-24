@@ -34,6 +34,12 @@ test('one script, the one the CSP allows', () => {
   const csp = doc.querySelector('meta[http-equiv="Content-Security-Policy"]').content;
   assert.match(csp, /default-src 'none'/);
   assert.ok(csp.includes(`script-src 'sha256-${sum}'`), `the script's hash is now 'sha256-${sum}'`);
+  // From outside, only Cloudflare's Web Analytics script (added to readfree.xyz by Cloudflare, not
+  // in this file), reporting to the site itself. The footer says so.
+  assert.deepEqual(csp.match(/https?:[^\s;]+/g), ['https://static.cloudflareinsights.com/beacon.min.js/']);
+  assert.match(csp, /; connect-src 'self';/);
+  assert.doesNotMatch(csp, /\*|script-src[^;]*'(self|unsafe-inline|unsafe-eval)'/);
+  assert.match(doc.querySelector('footer').textContent, /Cloudflare, adds a script/);
   assert.doesNotMatch(scripts[0][1], /\{\{/, 'no release fields in the script: they would change its hash');
 });
 

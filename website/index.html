@@ -2,7 +2,10 @@
 <!-- The site's front page, where the toolbar menu's "Get it" leads. A template: tools/release.sh
      build fills in the fields in double braces (the release and the site's address) and puts it
      in dist/.
-     It loads nothing from elsewhere: colors from the "solidarity" theme, its marks inlined. The
+     It loads nothing from elsewhere: colors from the "solidarity" theme, its marks inlined. (On
+     readfree.xyz Cloudflare adds its Web Analytics script to what it serves, which the footer
+     says. It isn't in this file. The CSP lets that script run and report to the site it's on,
+     and nothing else from outside.) The
      outlets are the extension's live sites (test/website.test.js checks). The script only makes
      the install command use the address it's served from (so a mirror installs from itself) and
      adds a Copy button; without it the page is complete. Its hash is in the CSP: after changing
@@ -13,7 +16,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-usMON3cpV3IgtoYn5KbYFS/i9BjW89FsdjtyDJc4Ods='; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-usMON3cpV3IgtoYn5KbYFS/i9BjW89FsdjtyDJc4Ods=' https://static.cloudflareinsights.com/beacon.min.js/; connect-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <title>Read Free</title>
   <meta name="description" content="A Chrome extension that opens the paywalled articles of news outlets boycotted over their coverage of Israel's genocide in Gaza.">
@@ -313,7 +316,11 @@
   <footer>
     <p>For personal use only.</p>
     <p>Read Free is open source: <a href="https://github.com/readfreexyz/read-free">github.com/readfreexyz/read-free</a>.</p>
-    <p>This page loads nothing from anywhere else and sets no cookies.</p>
+    <p>This page sets no cookies. On readfree.xyz its host, Cloudflare, adds a script that counts
+      visits by country, browser, device and the page that linked here, and measures how fast the
+      page loads. <a href="https://developers.cloudflare.com/speed/observatory/rum-beacon/">Cloudflare
+      says</a> it stores nothing in your browser and doesn't keep your IP address; most ad blockers
+      stop it. The page loads nothing else from outside, and the extension has no analytics.</p>
     <p>This release: <a href="latest.txt">latest.txt</a>, signed in
       <a href="latest.txt.sig">latest.txt.sig</a>. The zip's SHA-256: <code>{{sha256}}</code></p>
   </footer>
