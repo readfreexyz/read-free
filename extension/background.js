@@ -190,7 +190,9 @@ function start(job) {
 
 // A CAPTCHA archive.today asked for, by address, until a request gets past it or CHECK_MS is up:
 // { [host]: { url, at } }. Kept for the browser session, as this worker comes and goes.
-const CHECK_MS = 10 * 60 * 1000;
+// Not for long: the reader may have no check to complete (archive.today can ask scripts for one and
+// not a page they open), and another article may well be answered.
+const CHECK_MS = 60 * 1000;
 const CHECKS_KEY = 'nytfix:checks';
 let checks = null;
 let loadingChecks = null; // once: a second read could overwrite a check noted meanwhile

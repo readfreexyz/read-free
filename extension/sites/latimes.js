@@ -17,17 +17,24 @@
 
   const adapter = root.NYTFix?.adapter || require('../src/adapter.js');
   const BODY = 'article.story .ct-rich-text-children:has(> p)';
-  const LOCKED = 'article.story .subscriber-content';
+  const LOCKED = '.subscriber-content';
   const POPUP = 'modality-custom-element[name="metering-modal"]';
 
+  const ARTICLE = /^\/[a-z0-9-]+(\/[a-z0-9-]+)*\/(story|newsletter|articulo)\/\d{4}-\d{2}-\d{2}\/[a-z0-9-]+$/;
+  const textOnPage = adapter.textOnPage(BODY);
   const site = adapter.defineSite({
     id: 'latimes',
     name: 'Los Angeles Times',
     shortName: 'LA Times',
     hosts: ['www.latimes.com'],
     // Articles: /politics/story/2026-11-13/slug, /entertainment-arts/movies/story/2026-11-14/slug,
-    // and newsletters: /california/newsletter/2026-11-14/slug.
-    isArticle: path => /^\/[a-z0-9-]+(\/[a-z0-9-]+)*\/(story|newsletter)\/\d{4}-\d{2}-\d{2}\/[a-z0-9-]+$/.test(path),
+    // newsletters: /california/newsletter/2026-11-14/slug, and in Spanish:
+    // /espanol/entretenimiento/articulo/2026-11-24/slug.
+    isArticle: path => ARTICLE.test(path),
+    // The metering popup comes up on everything else too (the user, 2026-11-25: a gift guide,
+    // /lifestyle/list/slug): lists, recipes (/recipe/slug), projects, stories with no date. It only
+    // has to come off there; nothing is asked of archive.today. Not the home page or a section's.
+    isLive: path => !ARTICLE.test(path) && path.split('/').filter(Boolean).length > 1,
     live: {
       body: BODY,
       wall: {
@@ -38,7 +45,7 @@
         ),
         hide: POPUP,
         reveal: LOCKED,
-        type: adapter.textOnPage(BODY),
+        type: doc => (ARTICLE.test(doc.location?.pathname || '') ? textOnPage(doc) : 'lift'),
       },
     },
     snapshot: { skip: 'modality-custom-element' },

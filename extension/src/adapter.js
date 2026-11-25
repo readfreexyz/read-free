@@ -130,6 +130,46 @@
     return true;
   }
 
+  // A paragraph's or heading's HTML, from a site's own data, as runs of plain, linked or emphasized
+  // text (as extract.js makes them). Parsed, never put on the page: only the text, web links and
+  // emphasis come out of it.
+  function runsFromHtml(doc, html, base) {
+    const parsed = new doc.defaultView.DOMParser().parseFromString(String(html || ''), 'text/html');
+    const runs = [];
+    let spaced = true;
+    const add = (text, marks) => {
+      let s = text.replace(/\s+/g, ' ');
+      if (spaced) s = s.replace(/^ /, '');
+      if (!s) return;
+      spaced = s.endsWith(' ');
+      const last = runs[runs.length - 1];
+      if (last && last.href === marks.href && last.em === marks.em && last.strong === marks.strong) last.text += s;
+      else runs.push({ text: s, ...marks });
+    };
+    const walk = (node, marks) => {
+      for (const child of node.childNodes) {
+        if (child.nodeType === 3) add(child.textContent, marks);
+        else if (child.nodeType !== 1 || /^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|IFRAME)$/.test(child.tagName)) continue;
+        else if (child.tagName === 'BR') add(' ', marks);
+        else {
+          const next = { ...marks };
+          if (child.tagName === 'A') {
+            try {
+              const url = new URL(child.getAttribute('href') || '', base);
+              if (/^https?:$/.test(url.protocol)) next.href = url.href;
+            } catch { /* not an address */ }
+          }
+          if (/^(EM|I|CITE)$/.test(child.tagName)) next.em = true;
+          if (/^(STRONG|B)$/.test(child.tagName)) next.strong = true;
+          walk(child, next);
+        }
+      }
+    };
+    walk(parsed.body, {});
+    if (runs.length) runs[runs.length - 1].text = runs[runs.length - 1].text.replace(/ $/, '');
+    return runs.filter(run => run.text);
+  }
+
   // wall.detect: some element matching one of the selectors is drawn and has content (children,
   // text, or a shadow root: LA Times' metering popup draws everything in one). Paywall services
   // keep their modal on the page, hidden, until it's needed (Piano's .tp-modal on CNN).
@@ -244,7 +284,7 @@
 
   const adapter = {
     SERVICES, SNAPSHOT_BODY, selectorsFor, articleLd, markedPaywalled, bodyWords, wholeTextOnPage,
-    cutBody, textOnPage, visible, anyShown, scrollLocked, tailHidden, clipped, walledArticle, anyOf, defineSite,
+    cutBody, textOnPage, runsFromHtml, visible, anyShown, scrollLocked, tailHidden, clipped, walledArticle, anyOf, defineSite,
     HELD_ATTR, wallHeld, KEPT_ATTR, cutKept,
   };
   root.NYTFix = Object.assign(root.NYTFix || {}, { adapter });

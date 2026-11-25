@@ -107,10 +107,10 @@ problem. Once a wall is off it says so, and adds:
   notification as a reason (it waits for the next article), and in place of the donation link.
   Copies installed with the install script update themselves first, so they never see it
   ([docs/auto-update.md](docs/auto-update.md#the-update-notice)).
-- **Nothing, once there's nothing new:** after your first 5 articles, a wall coming off shows no
-  notification at all (the toolbar icon's ✓ still marks the page), and a reload of an article
-  you've read never does. **Confirm every time a wall comes off** in the settings brings them
-  back. A notification with a reason, a donation link or a newer version closes with its ×, or on its own; the line
+- **Every time a wall comes off**, reloads too. With **Confirm every time a wall comes off** turned
+  off in the settings, only when there's something new to say after your first 5 articles, or you
+  watched archive.today load (the toolbar icon's ✓ still marks the page).
+  A notification with a reason, a donation link or a newer version closes with its ×, or on its own; the line
   along its bottom shows how long it has left, and stops while you hover it.
 
 `extension/src/notify.js` makes these decisions from a small record in `chrome.storage.local`
@@ -180,6 +180,11 @@ otherwise stops extension storage at 10 MB).
 - **Login wall** ("This story is free to read. Log in to continue."): the whole story is already
   on the page under the wall, so hiding the wall is all there is to do, with no archive.today
   request. This works on articles, live blogs and interactive pages.
+- **Paywall, the whole article in the page:** NYT (since Nov 2026) and The Atlantic send it with the page
+  and cut it in the browser, so Read Free shows it from there: at once, with nothing asked of archive.today.
+  Its photos and links come along; graphics and videos don't, and the banner says how many. It's only
+  used if it's as long as NYT's own word count for the article (The Atlantic has none: more than the
+  page shows). Otherwise:
 - **Paywall:** the wall is gone right away, so you can read the first paragraphs while
   archive.today loads. Where NYT's text stops, a "Loading the rest of this article…"
   placeholder stands in for NYT's subscription line, lined up with the text column. If
@@ -220,9 +225,10 @@ otherwise stops extension storage at 10 MB).
   in with what happened, the outlet and the versions; never the article's address (paste it if you want that page looked at). Nothing is
   sent unless you send it.
 - **A CAPTCHA** is archive.today's to ask for and yours to complete; Read Free never goes around
-  one. **Complete the check** opens the page that asked. When you come back, Read Free tries again
-  by itself; other articles that were waiting do so too, once that worked and you get to them. Until
-  then, or for ten minutes, it doesn't ask archive.today for any other article. It asks for one
+  one, or passes its requests off as page visits. **Open the archived copy** opens the page that
+  asked: archive.today may show you the article there, with no CAPTCHA, though it asked Read Free for
+  one. When you come back, Read Free tries again by itself; other articles that were waiting do so too, once that worked and you get to them. Until
+  then, or for a minute, it doesn't ask archive.today for any other article. It asks for one
   article at a time, a second apart, starting with the one you're looking at, which may bring on fewer.
 - **A wall it doesn't recognize** (NYT for now; sites change their walls without warning):
   - If NYT would be showing its popup, it's a wall, whatever else NYT did to the page: Read Free

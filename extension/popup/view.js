@@ -2,7 +2,8 @@
 // 'nytfix:state' (src/content.js), the settings, and the tab's site, turned into words.
 //   describe({ url, site, page, prefs, reloading }) -> { title, sub, tone, text, action }
 //     page    { state: 'off' | 'not-article' | 'idle' | 'loading' | 'applied', mark, restored,
-//               missed: 'cut' | 'hidden' | 'frozen' | 'stuck', if a wall wasn't recognized },
+//               missed: 'cut' | 'hidden' | 'frozen' | 'stuck', if a wall wasn't recognized,
+//               inPage: the page was sent the whole article },
 //             or null when no content script answered
 //     reloading  the menu reloaded the tab (a switch changed) and it hasn't finished loading
 //     tone    the status dot: 'ok' | 'working' | 'off' | 'neutral'
@@ -52,7 +53,7 @@
             ...base,
             tone: 'neutral',
             text: cut ? "This page looks cut off, but Read Free didn't recognize a wall." : page.missed === 'frozen' ? "Read Free couldn't free the scrolling here." : "There's something here Read Free doesn't recognize.",
-            action: { id: 'toggle', label: article ? 'Load from archive.today' : 'Remove it', primary: true },
+            action: { id: 'toggle', label: !article ? 'Remove it' : page.inPage ? 'Show the whole article' : 'Load from archive.today', primary: true },
           };
         }
         if (page.restored) return { ...base, tone: 'neutral', text: "Showing the site's version, wall and all.", action: { id: 'toggle', label: 'Remove the wall', primary: true } };

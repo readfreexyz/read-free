@@ -158,7 +158,7 @@
   $('all-switch').addEventListener('change', async event => { prefs = await settings.save(sync, { enabled: event.target.checked }); show(); });
   function show() {
     $('all-switch').checked = prefs.enabled;
-    if ($('confirm-switch')) $('confirm-switch').checked = prefs.alwaysConfirm;
+    if ($('confirm-switch')) $('confirm-switch').checked = !prefs.quiet;
     if ($('donated-switch')) $('donated-switch').checked = prefs.donated;
     list.classList.toggle('all-off', !prefs.enabled);
     for (const [id, toggle] of switches) {
@@ -172,8 +172,8 @@
 
   // Notifications
   const confirm = $('confirm-switch');
-  confirm.checked = prefs.alwaysConfirm;
-  confirm.addEventListener('change', async () => { prefs = await settings.save(sync, { alwaysConfirm: confirm.checked }); });
+  confirm.checked = !prefs.quiet;
+  confirm.addEventListener('change', async () => { prefs = await settings.save(sync, { quiet: !confirm.checked }); });
   $('reasons-again').addEventListener('click', async () => {
     const local = chrome.storage.local;
     await notify.save(local, notify.startOver(await notify.load(local)));

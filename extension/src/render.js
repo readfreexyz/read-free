@@ -690,7 +690,9 @@
   // Swap in the snapshot text and the banner, keeping the reader's paragraph where it was.
   // Returns a function that takes them out again. The banner's "Show <site>'s version" button
   // calls onRestore, which should undo everything.
-  function apply(doc, site, { blocks, snapshotUrl, snapshotTime, onRestore }) {
+  // Without a snapshotUrl, the text is the site's own, from its page (site.live.fromPage); left: how
+  // many graphics or videos of its couldn't come along.
+  function apply(doc, site, { blocks, snapshotUrl, snapshotTime, left = 0, leftAs = ['graphic or video', 'graphics or videos'], onRestore }) {
     const reading = readingAnchor(doc, site); // before anything moves
     const resumeAnchoring = pauseScrollAnchoring(doc);
     const section = liveArticleBody(doc, site);
@@ -707,8 +709,10 @@
     else placeWithoutBody(doc, site, body);
     showBanner(doc, site, {
       kind: 'done',
-      message: `Full text from the archive.today snapshot of ${describeTime(snapshotTime)}.`,
-      links: [{ text: 'View snapshot', href: snapshotUrl }],
+      message: snapshotUrl
+        ? `Full text from the archive.today snapshot of ${describeTime(snapshotTime)}.`
+        : `Full text, from ${site.shortName || site.name}'s own page.${left ? ` ${left === 1 ? `A ${leftAs[0]}` : `${left} ${leftAs[1]}`} couldn't come along.` : ''}`,
+      links: snapshotUrl ? [{ text: 'View snapshot', href: snapshotUrl }] : [],
       actions: [{ text: `Show ${site.shortName}'s version`, onClick: () => onRestore?.() }],
     });
     const kept = keepReading(doc, body, reading);

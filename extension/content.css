@@ -163,6 +163,8 @@ html body[data-nytfix-unlock="fixed"][data-nytfix-unlock="fixed"] { position: st
    gradient drawn in its ::after. */
 html body [data-nytfix-swapped] .nytfix-body p { display: block !important; }
 html body [data-nytfix-swapped][data-nytfix-swapped]::after { display: none !important; }
+/* The note standing in for the rest isn't part of the text that fades out */
+html.nytfix-active body :has(> .nytfix-loading, > .nytfix-loading-row)::after { display: none !important; }
 /* National Post keeps its body invisible until its paywall script has decided. */
 html body [data-nytfix-swapped][data-nytfix-swapped] { visibility: visible !important; }
 

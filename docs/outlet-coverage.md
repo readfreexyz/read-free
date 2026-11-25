@@ -780,3 +780,17 @@ Not built:
 - **Reasons** (`src/reasons.js`): The Jerusalem Post's is from the research (PolitiFact, one retracted
   article). Haaretz's and Ynet's aren't: an opinion piece each (Mondoweiss; The Seventh Eye, read
   through a fetching service only). The Seventh Eye's calls Haaretz the only exception in Israel's press.
+
+## Text from the page, and what can't be (2026-11-25, the user's Chrome, signed out)
+
+- **The Atlantic** sends the whole article: `#__NEXT_DATA__`, in one of `pageProps.urqlState`'s answers (itself JSON),
+  `article.content`: 19 `ArticleParagraphContent` (`innerHtml`), 1,456 words with 298 showing; and 19 with 1,325 words, 3
+  paragraphs showing. `sites/atlantic.js` shows it from there. No word count to check it against: it has to be this page's
+  article and more than the page shows. Other kinds of content are handled from their names. Photos don't come along.
+- **WSJ** sends 4 paragraphs of 1,370 words; the rest is encrypted for subscribers (`encryptedDataHash`,
+  `encryptedDocumentKey`). Read Free doesn't decrypt it. archive.today, or nothing.
+- **LA Times:** its metering popup comes up on more than stories (a gift guide at `/lifestyle/list/slug`, in a private window;
+  seen in a screenshot, not in this Chrome). On the home page: 56 links to `/…/list/slug`, 18 to `/recipe/slug`, 4 to
+  undated stories, 3 to `/espanol/…/articulo/DATE/slug`, 2 to projects. All but `articulo` (an article) only get it taken off.
+- **FT, Der Spiegel, Le Monde, National Post, Haaretz** haven't been looked at again for this.
+

@@ -111,7 +111,14 @@ function atlanticSnapshotHtml({ paragraphs = 10 } = {}) {
 // with p.ArticleParagraph_root__… paragraphs and Zephr's (empty) gate slots at the end. cut: the
 // body cut to 4 paragraphs, as for a reader past the meter. marked: the JSON-LD marks the article
 // paywalled.
-function atlanticLivePageHtml({ cut = true, marked = true } = {}) {
+// data: what #__NEXT_DATA__ holds (the user's Chrome, 2026-11-25): the article in one of urqlState's
+// answers, itself JSON; { path, count, text, parts }.
+function atlanticData({ path = '/health/2026/11/some-article/689523/', count = 19, text = null, parts = [] } = {}) {
+  const content = [...Array.from({ length: count }, (_, i) => ({ __typename: 'ArticleParagraphContent', subtype: null, idAttr: `p${i}`, innerHtml: text || `Atlantic data paragraph ${i + 1}. ${LOREM}` })), { __typename: 'ArticleRelatedContentLink', title: 'Read: another story', url: 'https://www.theatlantic.com/x', innerHtml: 'Read: another story' }, ...parts];
+  const urqlState = { 1: { data: JSON.stringify({ layout: { name: 'x' } }) }, 2: { hasNext: false, data: JSON.stringify({ article: { __typename: 'BlogArticle', url: `https://www.theatlantic.com${path}`, content } }) } };
+  return `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { urqlState } } }).replaceAll('</', '<\\/')}</script>`;
+}
+function atlanticLivePageHtml({ cut = true, marked = true, data = null } = {}) {
   const ps = Array.from({ length: cut ? 4 : 40 }, (_, i) => `<p class="ArticleParagraph_root__4mszW">Live Atlantic paragraph ${i + 1}. ${LOREM}</p>`).join('');
   const ld = { '@context': 'https://schema.org', '@type': 'NewsArticle', isAccessibleForFree: !marked, ...(marked ? { hasPart: [{ '@type': 'WebPageElement', isAccessibleForFree: false, cssSelector: '.article-content-body' }] } : {}) };
   return `<!doctype html><html><head><script type="application/ld+json">${JSON.stringify(ld)}</script></head><body><div id="__next"><div>
@@ -121,7 +128,7 @@ function atlanticLivePageHtml({ cut = true, marked = true } = {}) {
       <div id="article-end"></div>
     </section>
   </div></article></main>
-</div></div></body></html>`;
+</div></div>${data ? atlanticData(data) : ''}</body></html>`;
 }
 
 // The New Yorker's snapshot (two samples): main#main-content > article with the header in
@@ -255,6 +262,22 @@ function pinInteractive(doc, { scrolled = 0 } = {}) {
   doc.getElementById('gateway-content').innerHTML = `<p id="gateway-exit-advisory">${EXIT_NOTE}</p><div></div>`;
   doc.getElementById('site-content').setAttribute('style', PIN(scrolled));
 }
+
+// The data NYT sends with an article (window.__preloadedData, an inline script; the user's Chrome,
+// 2026-11-25): a JavaScript object, not quite JSON. blocks: more of them, after the paragraphs.
+const inline = (text, ...formats) => ({ __typename: 'TextInline', text, formats });
+const block = (type, ...content) => ({ __typename: type, textAlign: 'DEFAULT', content });
+function nytData({ path = '/2026/11/14/world/europe/test-article.html', paragraphs = 14, blocks = [], wordCount = null, article = {} } = {}) {
+  const content = [
+    { __typename: 'HeaderBasicBlock', headline: { __typename: 'Heading1Block', content: [inline('Headline')] }, ledeMedia: { __typename: 'ImageBlock', media: { __typename: 'Image', caption: { text: 'Lede caption', content: [block('ParagraphBlock', inline('Lede caption'))] } } } },
+    ...Array.from({ length: paragraphs }, (_, i) => [block('ParagraphBlock', inline(`Page paragraph ${i + 1}. ${LOREM}`)), { __typename: 'Dropzone', index: i }]).flat(),
+    ...blocks,
+  ];
+  const words = paragraphs * `Page paragraph 1. ${LOREM}`.split(/\s+/).length;
+  const data = { loaderData: { data: { article: { __typename: 'Article', url: `https://www.nytimes.com${path}`, wordCount: wordCount ?? words, sprinkledBody: { __typename: 'DocumentBlock', content }, ...article } }, errors: '@undefined@' }, initialState: {}, config: { isOptimisticallyTruncated: true, meter: '@undefined@', note: 'left undefined, "quoted" \\ and so on' }, initialLocation: { pathname: path } };
+  return `<script>window.__preloadedData = ${JSON.stringify(data).replaceAll('"@undefined@"', 'undefined').replaceAll('</', '<\\u002F')};</script>`;
+}
+const withData = (html, options) => html.replace('</body>', `${nytData(options)}</body>`);
 
 // Puts a wall up on a page built with wall: null, the way NYT does a moment after load.
 function raiseWall(doc, wall, { marks = 'main' } = {}) {
@@ -631,4 +654,4 @@ module.exports = {
   nineLivePageHtml, nineSnapshotHtml, wsjLivePageHtml, wsjSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, lemondeLivePageHtml, lemondeSnapshotHtml,
   nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml,
   reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml,
-  LOREM, parse, snapshotHtml, ftSnapshotHtml, ftLivePageHtml, livePageHtml, interactivePageHtml, pinInteractive, EXIT_NOTE, raiseWall, TIMEMAP, timemapFor, mementoUrl, memoryArea };
+  LOREM, parse, snapshotHtml, ftSnapshotHtml, ftLivePageHtml, livePageHtml, nytData, withData, inline, block, interactivePageHtml, pinInteractive, EXIT_NOTE, raiseWall, TIMEMAP, timemapFor, mementoUrl, memoryArea };

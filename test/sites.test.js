@@ -251,6 +251,19 @@ test('batch 1: article URLs, and what is not one', () => {
   assert.equal(cnn.normalizeUrl('https://edition.cnn.com/2026/11/13/us/story?iid=x'), 'https://www.cnn.com/2026/11/13/us/story');
 });
 
+test('latimes: what is an article, what only gets its popup off, and what is neither', () => {
+  for (const path of ['/espanol/entretenimiento/articulo/2026-11-24/puerto-rico-sexta-corona', '/politics/story/2026-11-13/x']) {
+    assert.equal(latimes.isArticle(path), true, path);
+    assert.equal(latimes.isLive(path), false, path);
+  }
+  for (const path of ['/lifestyle/list/los-angeles-small-business-holiday-gift-guide-2026', '/recipe/pickle-brined-turkey', '/environment/story/colorado-river-in-crisis', '/projects/some-project/']) {
+    assert.equal(latimes.isArticle(path), false, path);
+    assert.equal(latimes.isLive(path), true, path);
+  }
+  for (const path of ['/', '/california', '/sports/']) assert.equal(latimes.isArticle(path) || latimes.isLive(path), false, path);
+  assert.equal(paywall.wallType(pageAt(latimesLivePageHtml(), 'https://www.latimes.com/lifestyle/list/x'), latimes), 'lift');
+});
+
 test('latimes: the metering popup is the wall; the whole text is on the page, so it just comes off', () => {
   const url = 'https://www.latimes.com/politics/story/2026-11-13/x';
   for (const layout of ['plain', 'gated', 'longform']) {

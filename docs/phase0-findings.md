@@ -129,9 +129,29 @@ incognito window with extensions off.
   the window and can't scroll. The note reads "To leave without logging in or creating an account, use your browser's
   Back button" (it used to say "signing in"). All the text was there (221 `<p>`). Read Free ignored `/interactive/`
   while its CSS hid the wall, which left the page frozen at the top.
-- **The page's own data doesn't hold the rest (2026-11-25, the user's Chrome, a cut article):** `window.__preloadedData`
-  had 9 `ParagraphBlock`s, 1,630 characters of text: about what a cut page shows. So the archive is still needed.
-  (Counting the word "ParagraphBlock" there finds more: type lists hold it too.)
+- **The page's own data didn't hold the rest, once (2026-11-25, the user's Chrome, a cut article):** `window.__preloadedData`
+  had 9 `ParagraphBlock`s, 1,630 characters of text: about what a cut page shows. (Counting the word "ParagraphBlock" there
+  finds more: type lists hold it too.) The next 5 articles looked at had it all (below); why that one didn't isn't known.
+  Where the data falls short of NYT's word count, Read Free still asks archive.today.
+- **The whole article is in the page (2026-11-25, 5 articles of 5, one signed-out browser; so Read Free checks it
+  against NYT's own word count each time):** in `window.__preloadedData`, an
+  inline script (a JavaScript object with some `undefined` values, not JSON): `loaderData.data.article.sprinkledBody.content`.
+  `config.isOptimisticallyTruncated` is true, also on an article with no wall. Against `article.wordCount`, on 5 articles:
+  1,164 words of 1,160; 1,360 of 1,347; 1,776 of 1,738; 995 of 976; 3,079 of 3,059. Seen at the top level:
+  `ParagraphBlock`, `Heading2Block`, `DetailBlock`, `ImageBlock`, `InteractiveBlock`, and `Dropzone`, `RuleBlock`,
+  `RelatedLinksBlock`, `Header…Block` (not the article's). Text is `TextInline` with `LinkFormat`, `ItalicFormat`,
+  `BoldFormat`. Other kinds (lists, quotes, diptychs, grids) are handled from their names, not from a page seen.
+- **Something else in the browser can hide the popup:** a `<style>` in the head of a cut article, in the user's Chrome
+  (`#gateway-content { display: none }`), so only the backdrop showed. It isn't in NYT's HTML, uBlock's default lists or
+  Read Free, and it was gone once the user had turned off another ad blocker. Measuring the popup finds no wall there;
+  the marks and the cut line do. Without it, the popup let out for the measurement was 394x64 in the window, seen,
+  with no scrolling (a reader at 600 stayed there), and "Show NYT's version" showed the whole wall.
+- **A page with no wall** (an article from 2022, 48 paragraphs): no `#gateway-content` at all, nothing inert, no
+  subscription line. Read Free did nothing in 14 s.
+- **archive.today asked a script for a CAPTCHA, and not a page visit (seen once, the same day):** the snapshot of a cut
+  article opened in a tab: the article (95 KB sent, 2.2 MB), twice, not from the cache. `fetch()` of the same address from that very page,
+  with its cookies: 59 KB, a CAPTCHA. So there may be no check for the reader to complete. Read Free doesn't disguise
+  its requests to get past that.
 - **CSP is permissive:** `img-src data: https: blob:`, `style-src 'unsafe-inline' https:`,
   no Trusted Types. Injected markup and either image source (archive or static01) will load.
 - **NYT uses DataDome:** a cookieless fetch of the article gets a 403 bot challenge. The extension

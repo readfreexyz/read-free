@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const manifest = require('../extension/manifest.json');
-const { livePageHtml, interactivePageHtml, pinInteractive, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
+const { livePageHtml, withData, inline, block, interactivePageHtml, pinInteractive, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
 const { VERSION: CACHE_VERSION } = require('../extension/src/cache.js');
 const archive = require('../extension/src/archive.js');
 
@@ -669,7 +669,7 @@ test('the other address wants a CAPTCHA: it says which, links there, and asks no
   try {
     await waitFor(() => page.banner()?.dataset.kind === 'error');
     assert.match(page.banner().textContent, /archive\.is wants a CAPTCHA/);
-    page.button('Complete the check').click();
+    page.button('Open the archived copy').click();
     assert.equal(page.opened[0][0], newestUrl(ARTICLE, 'archive.is'));
     assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is')]);
   } finally {
@@ -1873,7 +1873,7 @@ test("the menu asks what's going on: the site, what was done, and whether the re
 
 // The notification once the wall is off (notify.js): the reason the first time, then quiet
 
-test("reuters: the first wall off says why Reuters is boycotted, with its source; a regular reader's next one says nothing", async () => {
+test("reuters: the first wall off says why Reuters is boycotted, with its source; a regular reader's next one says so, or nothing with quiet on", async () => {
   const url = 'https://www.reuters.com/world/us/battle-young-male-voters-2026-11-15/';
   const storage = memoryArea();
   const first = boot({ url, html: reutersLivePageHtml({ modal: true }), storage });
@@ -1890,15 +1890,18 @@ test("reuters: the first wall off says why Reuters is boycotted, with its source
     first.close();
   }
   // A regular reader: past the first articles, Reuters explained last week.
-  const regular = memoryArea({ notify: { v: 1, fixed: 40, articles: [], days: [], sites: { reuters: Date.now() - 7 * 864e5 }, donate: {} } });
-  const later = boot({ url: 'https://www.reuters.com/world/another-story-2026-11-16/', html: reutersLivePageHtml({ modal: true }), storage: regular });
-  try {
-    await waitFor(() => later.mark() === 'lifted');
-    await sleep(50);
-    assert.equal(later.doc.getElementById('nytfix-status'), null, 'no notification: the toolbar ✓ marks it');
-    assert.equal(regular.data.notify.fixed, 41);
-  } finally {
-    later.close();
+  for (const quiet of [false, true]) {
+    const regular = memoryArea({ notify: { v: 1, fixed: 40, articles: [], days: [], sites: { reuters: Date.now() - 7 * 864e5 }, donate: {} } });
+    const later = boot({ url: 'https://www.reuters.com/world/another-story-2026-11-16/', html: reutersLivePageHtml({ modal: true }), storage: regular, sync: memoryArea({ settings: { quiet } }) });
+    try {
+      await waitFor(() => later.mark() === 'lifted');
+      await sleep(50);
+      if (quiet) assert.equal(later.doc.getElementById('nytfix-status'), null, 'no notification: the toolbar ✓ marks it');
+      else assert.match(statusText(later), /Removed Reuters's wall\./);
+      assert.equal(regular.data.notify.fixed, 41);
+    } finally {
+      later.close();
+    }
   }
 });
 
@@ -2124,7 +2127,7 @@ test("something unknown that NYT shows: after a wait NYT's version goes back up,
     assert.ok(page.doc.documentElement.classList.contains('nytfix-off'));
     await sleep(700); // the known-wall watch sees the popup on screen now: it must not act by itself
     assert.deepEqual(page.fetched, []);
-    assert.deepEqual(await page.state(), { site: 'nyt', state: 'idle', mark: null, restored: false, missed: 'hidden', article: true });
+    assert.deepEqual(await page.state(), { site: 'nyt', state: 'idle', mark: null, restored: false, missed: 'hidden', article: true, inPage: false });
     const mail = page.doc.getElementById('nytfix-status').shadowRoot.querySelector('.offer a');
     assert.match(mail.href, /^mailto:/);
     assert.ok(!decodeURIComponent(mail.href).includes('nytimes.com'), 'never the address');
@@ -2318,9 +2321,9 @@ test('a CAPTCHA on the snapshot: the button opens that page, not the lookup; not
   const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE } });
   try {
     await waitFor(() => page.banner()?.dataset.kind === 'error');
-    assert.match(page.banner().textContent, /wants a CAPTCHA before it sends the article\. Complete the check, then come back/);
+    assert.match(page.banner().textContent, /wants a CAPTCHA before it sends Read Free the article\. Open the archived copy to read it there/);
     assert.doesNotMatch(page.doc.body.textContent, /toolbar button/);
-    for (const button of [page.button('Complete the check'), inNote(page, 'Complete the check')]) button.click();
+    for (const button of [page.button('Open the archived copy'), inNote(page, 'Open the archived copy')]) button.click();
     assert.deepEqual(page.opened, [[snapshotUrl(T[3]), '_blank', 'noopener'], [snapshotUrl(T[3]), '_blank', 'noopener']]);
     assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
     assert.deepEqual(page.forced, [false]);
@@ -2333,7 +2336,7 @@ test('back from the check: the article is asked for once more, and goes in', asy
   let asked = 0;
   const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: () => (++asked === 1 ? CHECK_PAGE : { ...ok(COMPLETE), url: snapshotUrl(T[3]) }) } });
   try {
-    (await waitFor(() => page.button('Complete the check'))).click();
+    (await waitFor(() => page.button('Open the archived copy'))).click();
     page.visibility('hidden');
     await sleep(30);
     assert.equal(asked, 1, 'not while away');
@@ -2351,10 +2354,10 @@ test('back from the check: the article is asked for once more, and goes in', asy
 test("back without completing it: asked once, told again; looking away and back doesn't ask any more", async () => {
   const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE }, checkWanted: () => true });
   try {
-    (await waitFor(() => page.button('Complete the check'))).click();
+    (await waitFor(() => page.button('Open the archived copy'))).click();
     page.visibility('hidden');
     page.visibility('visible');
-    await waitFor(() => page.fetched.length === 2 && page.button('Complete the check'));
+    await waitFor(() => page.fetched.length === 2 && page.button('Open the archived copy'));
     for (let i = 0; i < 3; i++) { page.visibility('hidden'); page.visibility('visible'); await sleep(20); }
     assert.equal(page.fetched.length, 2);
     assert.ok(page.checksAsked.length >= 1 && page.checksAsked.every(h => h === 'archive.ph'));
@@ -2368,7 +2371,7 @@ test('a check another page is waiting for: nothing is asked, and once it is comp
   const waiting = { ok: false, error: 'a check is waiting', reason: 'check', check: snapshotUrl(T[2], OTHER) };
   const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: () => (wanted ? waiting : { ...ok(COMPLETE), url: snapshotUrl(T[3]) }) }, checkWanted: () => wanted });
   try {
-    await waitFor(() => page.button('Complete the check'));
+    await waitFor(() => page.button('Open the archived copy'));
     assert.deepEqual(page.fetched, [newestUrl(ARTICLE)], 'no list, no other address');
     page.visibility('hidden');
     page.visibility('visible');
@@ -2387,7 +2390,7 @@ test('a check another page is waiting for: nothing is asked, and once it is comp
 test("another article in the page, or the reader's own undo: coming back asks for nothing", async () => {
   const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE } });
   try {
-    (await waitFor(() => page.button('Complete the check'))).click();
+    (await waitFor(() => page.button('Open the archived copy'))).click();
     await page.toggle(); // NYT's version
     page.visibility('hidden');
     page.visibility('visible');
@@ -2412,5 +2415,180 @@ test('a page that is loading says whether the reader is looking at it', async ()
     assert.equal(page.looking.length, 2, 'only while loading');
   } finally {
     page.close();
+  }
+});
+
+// NYT sends the whole article with the page it cuts (sites/nyt.js): shown from there, nothing fetched
+const CUT_WITH_DATA = options => withData(livePageHtml({ marks: 'parts', upsell: 'inside' }), options);
+
+test("a paywalled NYT article whose page was sent it all: shown from the page, archive.today isn't asked; undo and back", async () => {
+  const page = boot({ html: CUT_WITH_DATA(), responses: good });
+  try {
+    await waitFor(page.body);
+    const texts = [...page.body().querySelectorAll('p')].map(p => p.textContent);
+    assert.equal(texts.length, 14);
+    assert.match(texts[13], /^Page paragraph 14\./);
+    assert.match(page.banner().textContent, /Full text, from NYT's own page\./);
+    assert.doesNotMatch(page.banner().textContent, /archive|snapshot|couldn't come along/);
+    assert.match(statusText(page), /Removed NYT's wall/);
+    assert.equal(page.mark(), 'lifted');
+    assert.equal(page.body().closest('[inert]'), null);
+    assert.deepEqual(JSON.parse(JSON.stringify(await page.state())), { site: 'nyt', state: 'applied', mark: 'lifted', restored: false });
+    page.button("Show NYT's version").click();
+    assert.equal(page.body(), null);
+    assert.ok(page.doc.documentElement.classList.contains('nytfix-off'));
+    await page.toggle();
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, []);
+    assert.deepEqual(Object.keys(page.storage.data).filter(k => k.startsWith('article:')), [], 'nothing to save');
+  } finally {
+    page.close();
+  }
+});
+
+test("the site's own words stay words: nothing in the data becomes markup", async () => {
+  const page = boot({ html: CUT_WITH_DATA({ blocks: [block('ParagraphBlock', inline('<img src=x onerror="window.pwned=1"> & <b>bold</b>'))] }) });
+  try {
+    await waitFor(page.body);
+    assert.equal(page.body().querySelector('img, b'), null);
+    assert.match(page.body().lastElementChild.textContent, /<img src=x/);
+    assert.equal(page.window.pwned, undefined);
+  } finally {
+    page.close();
+  }
+});
+
+test('graphics and videos that cannot come along are mentioned', async () => {
+  const page = boot({ html: CUT_WITH_DATA({ blocks: [{ __typename: 'InteractiveBlock' }, { __typename: 'VideoBlock' }] }) });
+  try {
+    await waitFor(page.body);
+    assert.match(page.banner().textContent, /2 graphics or videos couldn't come along\./);
+  } finally {
+    page.close();
+  }
+});
+
+test('the data is short, for another article, or no more than the page shows: archive.today, as before', async () => {
+  for (const [options, live] of [[{ wordCount: 9000 }, {}], [{ path: OTHER_PATH }, {}], [{ paragraphs: 3 }, { paragraphs: 5 }]]) { // the last: the page shows more than its data
+    const page = boot({ html: withData(livePageHtml({ marks: 'parts', upsell: 'inside', ...live }), options), responses: good });
+    try {
+      await waitFor(page.body);
+      assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+      assert.equal(page.mark(), 'swapped');
+    } finally {
+      page.close();
+    }
+  }
+});
+
+test('a reader with no wall: the data is there for them too, and nothing happens', async () => {
+  const page = boot({ html: withData(livePageHtml({ wall: null })) });
+  try {
+    await sleep(120);
+    assert.equal(page.body(), null);
+    assert.equal(page.mark(), null);
+    assert.deepEqual(page.fetched, []);
+  } finally {
+    page.close();
+  }
+});
+
+test('a cut article with no wall to see, whose page was sent it all: the note offers that', async () => {
+  const page = boot({ html: withData(unknownWall({ upsell: 'inside', popup: '', shown: false })), responses: good, scripts: quick(ARTICLE) });
+  try {
+    const button = await waitFor(() => offerButton(page));
+    assert.equal(button.textContent, 'Show the whole article');
+    assert.equal((await page.state()).inPage, true);
+    button.click();
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, []);
+  } finally {
+    page.close();
+  }
+});
+
+// Every wall that comes off is said: text from the page, a wall only lifted, a reload. Quiet (the
+// settings) turns that off.
+const REGULAR = () => ({ v: 1, fixed: 40, articles: ['https://www.nytimes.com/2026/11/01/us/x.html'], days: ['2026-11-01', '2026-11-02', '2026-11-03'], sites: { nyt: Date.now() }, donate: { lastAskAt: Date.now(), snoozeUntil: 0, asks: 1 }, update: { lastAt: 0 }, months: {} });
+test('a regular reader is told each time, reloads too; with quiet on, not', async () => {
+  for (const quiet of [false, true]) {
+    const storage = memoryArea({ notify: REGULAR() });
+    const sync = memoryArea({ settings: { quiet } });
+    const expected = quiet ? /^$/ : /Removed NYT's wall\./;
+    for (const visit of ['first', 'reload']) {
+      const page = boot({ html: CUT_WITH_DATA(), storage, sync });
+      try {
+        await waitFor(page.body);
+        await sleep(40);
+        assert.match(statusText(page) || '', expected, `${visit}, quiet ${quiet}`);
+      } finally {
+        page.close();
+      }
+    }
+    const lifted = boot({ url: INTERACTIVE, html: interactivePageHtml(), storage, sync });
+    try {
+      await waitFor(() => lifted.mark() === 'lifted');
+      await sleep(40);
+      assert.match(statusText(lifted) || '', expected, `lifted, quiet ${quiet}`);
+    } finally {
+      lifted.close();
+    }
+  }
+});
+
+// LA Times: the metering popup on pages that aren't articles
+test('latimes: the popup comes off a list, a recipe or an undated story too, with nothing fetched', async () => {
+  for (const path of ['/lifestyle/list/holiday-gift-guide-2026', '/recipe/pickle-brined-turkey', '/environment/story/a-river-in-crisis', '/projects/some-project/']) {
+    const html = latimesLivePageHtml().replaceAll(' class="story"', '').replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/, '');
+    const page = boot({ url: `https://www.latimes.com${path}`, html });
+    try {
+      await waitFor(() => page.mark() === 'lifted');
+      const popup = page.doc.querySelector('modality-custom-element');
+      assert.ok(popup.hasAttribute('data-nytfix-hidden'), path);
+      assert.equal(page.doc.body.style.getPropertyValue('overflow'), 'visible', 'scrolling unlocked');
+      assert.deepEqual(page.fetched, [], path);
+      assert.match(statusText(page), /Removed LA Times's wall\./);
+    } finally {
+      page.close();
+    }
+  }
+  const section = boot({ url: 'https://www.latimes.com/california', html: latimesLivePageHtml() });
+  try {
+    await sleep(80);
+    assert.equal(section.mark(), null, "a section's own page");
+    assert.deepEqual(section.fetched, []);
+  } finally {
+    section.close();
+  }
+});
+
+// The Atlantic sends the whole article with the page it cuts
+const ATLANTIC_CUT = 'https://www.theatlantic.com/health/2026/11/some-article/689523/';
+test('Atlantic: the whole article from the page, with its links; archive.today is not asked', async () => {
+  const page = boot({ url: ATLANTIC_CUT, html: atlanticLivePageHtml({ data: { parts: [{ __typename: 'ArticleParagraphContent', innerHtml: 'See <a href="https://example.com/x" onclick="pwned=1">this</a> and <em>that</em>.<img src=x onerror="pwned=1">' }, { __typename: 'ArticleInlineImageContent' }] } }) });
+  try {
+    await waitFor(page.body);
+    const ps = [...page.body().querySelectorAll('p')];
+    assert.equal(ps.length, 20);
+    assert.equal(ps[19].textContent, 'See this and that.');
+    assert.equal(ps[19].querySelector('a').getAttribute('href'), 'https://example.com/x');
+    assert.equal(page.body().querySelector('img, [onclick]'), null);
+    assert.match(page.banner().textContent, /Full text, from The Atlantic's own page\. A photo or graphic couldn't come along\./);
+    assert.deepEqual(page.fetched, []);
+    assert.equal(page.mark(), 'lifted');
+  } finally {
+    page.close();
+  }
+});
+
+test('Atlantic: data for another article, or no more than the page shows: archive.today, as before', async () => {
+  for (const data of [{ path: '/health/2026/11/another/1/' }, { count: 2 }, { count: 4, text: 'Short.' }]) {
+    const page = boot({ url: ATLANTIC_CUT, html: atlanticLivePageHtml({ data }) });
+    try {
+      await waitFor(() => page.fetched.length > 0);
+      assert.equal(page.fetched[0], `https://archive.ph/newest/${ATLANTIC_CUT}`);
+    } finally {
+      page.close();
+    }
   }
 });

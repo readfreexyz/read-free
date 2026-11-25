@@ -14,10 +14,10 @@
 // A newer version (src/release.js, for copies loaded by hand) is mentioned at most every three
 // days until the reader updates, never with a reason (it waits for the next article), and in
 // place of the donation link.
-// After the first 5 articles, a wall coming off with nothing new to say shows no notification
-// at all (the toolbar icon's ✓ still marks the page), unless the reader asked to be told every
-// time (settings: alwaysConfirm); a reload of an article already read never does. A wait for
-// archive.today always ends with one, since the reader watched it load.
+// Every wall that comes off is said, reloads too, unless the reader asked for quiet (settings:
+// quiet). Then, after the first 5 articles, a wall coming off with nothing new to say shows no
+// notification at all (the toolbar icon's ✓ still marks the page), and neither does a reload of an
+// article already read; a wait for archive.today always ends with one, since they watched it load.
 // plan() is pure: content.js loads the record when the page starts (with the settings, so the
 // decision is made at once) and saves plan().next.
 (function (root) {
@@ -119,14 +119,15 @@
   }
   const explained = (state, site, now = Date.now()) => ({ ...state, sites: { ...state.sites, [site]: now } });
 
-  // A wall came off. outcome: 'lifted' | 'swapped' | 'saved' (a saved copy) | 'partial'.
+  // A wall came off. outcome: 'lifted' | 'swapped' | 'saved' (a saved copy) | 'partial' | 'page'
+  // (the text was in the site's page). quiet: the reader asked for it.
   // paid: it was a paywall (false for NYT's login wall). explainedHere: the reason was already
   // shown on this page (while archive.today loaded). donated: the reader said they donated.
   // newer: a newer version is out (release.notice(): { version, href, text }), or null.
   // Returns { show, explain, donate, update, hideAfterMs, next }: whether to show a notification
   // at all; explain the reason open; offer the donation link (the tip, or null); say a newer
   // version is out (newer, or null); how long the bar stays; the record to save.
-  function plan(state, { site, article, outcome, reason, tip, paid = true, explainedHere = false, alwaysConfirm = false, donated = false, newer = null, now = Date.now() }) {
+  function plan(state, { site, article, outcome, reason, tip, paid = true, explainedHere = false, quiet = false, donated = false, newer = null, now = Date.now() }) {
     const repeat = state.articles.includes(article);
     const explain = !explainedHere && explainNow(state, { site, article, reason, now });
     const today = dayOf(now);
@@ -149,7 +150,7 @@
     };
     const hideAfterMs = explain ? RULES.hideMs.explain : donate ? RULES.hideMs.donate : update ? RULES.hideMs.update : RULES.hideMs.brief;
     const waited = outcome === 'swapped' || outcome === 'partial'; // the reader watched archive.today load
-    const show = explain || donate || update || explainedHere || waited || (!repeat && (alwaysConfirm || state.fixed < RULES.quietAfterFixes));
+    const show = !quiet || explain || donate || update || explainedHere || waited || (!repeat && state.fixed < RULES.quietAfterFixes);
     return { show, explain, donate: donate ? tip : null, update: update ? newer : null, hideAfterMs, next };
   }
 

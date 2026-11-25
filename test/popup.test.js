@@ -73,6 +73,7 @@ test("a wall that wasn't recognized: the menu says so and offers it by hand", ()
   const at = page => describe({ url: url('https://www.nytimes.com/2026/11/14/us/x.html'), site: nyt, page: { state: 'idle', ...page }, prefs: ON });
   assert.match(at({ missed: 'cut', article: true }).text, /looks cut off/);
   assert.deepEqual(at({ missed: 'cut', article: true }).action, { id: 'toggle', label: 'Load from archive.today', primary: true });
+  assert.equal(at({ missed: 'cut', article: true, inPage: true }).action.label, 'Show the whole article');
   assert.match(at({ missed: 'hidden', article: true }).text, /doesn't recognize/);
   assert.equal(at({ missed: 'hidden', article: false }).action.label, 'Remove it');
   assert.match(at({ missed: 'frozen', article: false }).text, /couldn't free the scrolling/);

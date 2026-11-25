@@ -76,7 +76,8 @@ nothing said so. Readers' own pages are where that shows, and there's no telemet
 
 - **A hidden popup is measured** (`paywall.hiddenPopupShows`): site CSS hides NYT's popup, so it's let out
   (`.nytfix-probe`) just for the measurement. On screen, with the wall's wording or a cut article, it's a
-  wall, whatever marks NYT uses (`wall.probe`).
+  wall, whatever marks NYT uses (`wall.probe`). It can't help where something else hides the popup too (seen on
+  one cut article, `docs/phase0-findings.md`); the note below can.
 - **It fails open** (`wall.failOpen`, `paywall.watchMissed`, `render.frozen`): a popup that isn't
   recognized, or a page still frozen after a lift, gets the site's wall back, with a note and an email link.
 - **A cut article with no wall** gets a note, and is fetched only on request (`wall.cut`).

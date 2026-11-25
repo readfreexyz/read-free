@@ -4,8 +4,8 @@
 //   mirror         which archive.today address to use
 //   enabled        false: the extension is off everywhere
 //   disabledSites  adapter ids (sites/*.js) the reader turned it off on, e.g. ['nyt', 'smh']
-//   alwaysConfirm  show a notification every time a wall comes off (notify.js otherwise goes
-//                  quiet once there's nothing new to say)
+//   quiet          no notification when a wall comes off unless there's something new to say
+//                  (notify.js; up to 0.26.1 that was the rule, with alwaysConfirm to opt out)
 //   donated        the reader says they donated: the donation link is never offered again
 //                  (taken on trust; the toolbar menu and settings page still have it)
 (function (root) {
@@ -13,7 +13,7 @@
 
   const archive = (root.NYTFix && root.NYTFix.archive) || (typeof require === 'function' ? require('./archive.js') : null);
   const KEY = 'settings';
-  const DEFAULTS = Object.freeze({ mirror: archive.DEFAULT_MIRROR, enabled: true, disabledSites: Object.freeze([]), alwaysConfirm: false, donated: false });
+  const DEFAULTS = Object.freeze({ mirror: archive.DEFAULT_MIRROR, enabled: true, disabledSites: Object.freeze([]), quiet: false, donated: false });
   const SITE_ID = /^[a-z0-9-]{1,40}$/;
   // Where the donation link goes. Leave empty to show no donation link anywhere.
   const TIP_URL = 'https://ko-fi.com/readfree';
@@ -42,7 +42,7 @@
       mirror: archive.MIRRORS.includes(s.mirror) ? s.mirror : DEFAULTS.mirror,
       enabled: s.enabled !== false,
       disabledSites: [...new Set(ids)].sort(),
-      alwaysConfirm: s.alwaysConfirm === true,
+      quiet: s.quiet === true,
       donated: s.donated === true,
     };
   }

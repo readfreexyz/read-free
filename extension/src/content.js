@@ -135,7 +135,7 @@
   const pageState = () => (!siteOn() ? 'off' : !supportedPage() ? 'not-article' : stateName());
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type === 'nytfix:state') {
-      sendResponse({ site: site.id, state: pageState(), mark: iconMark?.state || null, restored: userRestored, ...(missed ? { missed, article: site.isArticle(location.pathname) } : {}) });
+      sendResponse({ site: site.id, state: pageState(), mark: iconMark?.state || null, restored: userRestored, ...(missed ? { missed, article: site.isArticle(location.pathname), inPage: Boolean(articleInPage()) } : {}) });
       return false;
     }
     // Copy page details (the menu): the page's structure, whatever kind of page it is
@@ -233,7 +233,7 @@
     statusBar.create(document).finish('info', message, {
       hideAfterMs: 30000,
       offer: {
-        button: what === 'frozen' || what === 'stuck' ? null : article ? 'Load from archive.today' : 'Remove it',
+        button: what === 'frozen' || what === 'stuck' ? null : !article ? 'Remove it' : articleInPage() ? 'Show the whole article' : 'Load from archive.today',
         onAccept: () => { if (!loading && !applied()) activate({ manual: true }); },
         report: reportLink(message),
       },
@@ -308,6 +308,7 @@
       return;
     }
     if (site.isArticle(location.pathname)) {
+      if ((wall || byHand) && showFromPage()) return;
       run({ force: manual });
       return;
     }
@@ -398,6 +399,24 @@
     markIcon(null);
   }
 
+  // The whole article, if the site's page was sent it (site.live.fromPage): nothing to ask
+  // archive.today for. True if it's in.
+  function articleInPage() {
+    let text = null;
+    try { text = site.live.fromPage?.(document) || null; } catch (e) { console.warn('[Read Free]', e); }
+    return text && text.chars > render.liveStats(document, site).chars ? text : null;
+  }
+  function showFromPage() {
+    const text = articleInPage();
+    if (!text) return false;
+    pagePaywalled = true;
+    stopWaiting();
+    render.removeBanner(document);
+    show(text);
+    announce(null, `Removed ${site.shortName || site.name}'s wall. The whole article was in its page.`, 'page');
+    return true;
+  }
+
   // Swap in archived text (lifting the wall first, if it isn't already).
   function show(snapshot, { again = false } = {}) {
     guardPausedUntil = Date.now() + HOLD_PLACE_MS; // apply() keeps the reader's paragraph in place itself
@@ -406,7 +425,8 @@
     render.hideWall(document); // in case it was shown again after archive.today couldn't help
     undoSwap?.();
     undoSwap = render.apply(document, site, { ...snapshot, onRestore: undo });
-    markIcon('swapped', `Showing the article from archive.today, in place of ${site.shortName || site.name}'s paywall.`);
+    if (snapshot.snapshotUrl) markIcon('swapped', `Showing the article from archive.today, in place of ${site.shortName || site.name}'s paywall.`);
+    else markIcon('lifted', `Removed ${site.shortName || site.name}'s paywall. The whole article was in its page.`);
     if (!again) guardSwap(snapshot);
   }
 
@@ -493,9 +513,12 @@
   const tryAgain = { text: 'Try again', onClick: retry };
 
   // archive.today wants a CAPTCHA, which is the reader's to complete: in a tab, on the page that
-  // asked. Its cookie then goes with Read Free's own requests, so when they come back the article is
-  // asked for again, once. A check completed from another article's page counts too: this one sees
-  // that when the reader gets to it (nytfix:check).
+  // asked. It may not show one there: it can ask scripts for one and not a page the reader opens (the
+  // user's Chrome, 2026-11-25: the article in a tab; a CAPTCHA to a script on that very page, with the
+  // same cookies). Then the archived copy is there to read; Read Free doesn't pass its requests off as
+  // page visits. If there was one, its cookie goes with Read Free's own requests, so when the reader
+  // comes back the article is asked for again, once. A check completed from another article's page
+  // counts too: this one sees that when the reader gets to it (nytfix:check).
   let stopWaiting = () => {};
   function waitForCheck(check) {
     stopWaiting();
@@ -519,7 +542,7 @@
       stopWaiting = () => {};
     };
     return {
-      text: 'Complete the check',
+      text: 'Open the archived copy',
       onClick: () => {
         opened = true;
         window.open(check, '_blank', 'noopener');
@@ -557,7 +580,7 @@
     }
     if (!res) throw new FixError("The extension's background worker didn't answer. Reload the page and try again.");
     const host = new URL(url).hostname;
-    const wantsCheck = check => new FixError(`${host} wants a CAPTCHA before it sends the article. Complete the check, then come back: Read Free tries again by itself.`, { blocked: true, check: archive.isArchiveUrl(check) ? check : url });
+    const wantsCheck = check => new FixError(`${host} wants a CAPTCHA before it sends Read Free the article. Open the archived copy to read it there, or to complete the check if it shows one.`, { blocked: true, check: archive.isArchiveUrl(check) ? check : url });
     if (!res.ok) {
       if (res.reason === 'check') throw wantsCheck(res.check);
       if (res.reason) console.info(`[Read Free] ${host}: ${res.error} (${res.reason})`);
@@ -811,7 +834,7 @@
   // to say. paid: the wall was a paywall (not NYT's login wall), for the reader's tally.
   function announce(status, message, outcome, { paid = true } = {}) {
     const reason = reasonsLib.reasonFor(site.id);
-    const plan = notifyLib.plan(notifyState, { site: site.id, article: site.normalizeUrl(location.href), outcome, reason, tip: settingsLib.tipLink(), paid, explainedHere, alwaysConfirm: prefs?.alwaysConfirm, donated: prefs?.donated, newer });
+    const plan = notifyLib.plan(notifyState, { site: site.id, article: site.normalizeUrl(location.href), outcome, reason, tip: settingsLib.tipLink(), paid, explainedHere, quiet: prefs?.quiet, donated: prefs?.donated, newer });
     remember(plan.next);
     if (!plan.show) {
       status?.remove();

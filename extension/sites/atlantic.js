@@ -19,6 +19,60 @@
   // ran 8.5k–15k characters (roughly 1,400–2,500 words); the cut one had 341.
   const CUT_WORDS = 600;
 
+  // The whole article, from the data the page is sent (#__NEXT_DATA__): one of pageProps.urqlState's
+  // answers holds article.content. In the user's Chrome, 2026-11-25, past the meter: 19 paragraphs,
+  // 1,456 words, with 298 showing; and 19, 1,325 words, with 3 paragraphs showing. Seen there:
+  // ArticleParagraphContent { innerHtml }, ArticleRelatedContentLink (not the article's). Others are
+  // handled from their names. There's no word count to check it against: it has to be this page's
+  // article, and more of it than the page shows (content.js).
+  function articleFromPage(doc) {
+    let article = null;
+    try {
+      const state = JSON.parse(doc.getElementById('__NEXT_DATA__').textContent).props.pageProps.urqlState;
+      for (const { data } of Object.values(state)) {
+        const found = typeof data === 'string' && data.includes('"content"') ? JSON.parse(data).article : null;
+        if (Array.isArray(found?.content)) article = found;
+      }
+    } catch {
+      return null;
+    }
+    if (!article) return null;
+    const base = 'https://www.theatlantic.com';
+    const pathOf = href => { try { return new URL(href, base).pathname.replace(/\/$/, ''); } catch { return null; } };
+    if (pathOf(article.url) !== (doc.location?.pathname || '').replace(/\/$/, '')) return null;
+    const blocks = [];
+    let left = 0;
+    const paragraph = (html, prefix = '') => {
+      const inlines = adapter.runsFromHtml(doc, html, base);
+      const list = prefix && inlines.length ? [{ text: prefix }, ...inlines] : inlines;
+      const text = list.map(run => run.text).join('').replace(/\s+/g, ' ').trim();
+      return text ? { text, inlines: list } : null;
+    };
+    for (const part of article.content) {
+      const type = part?.__typename || '';
+      const html = typeof part?.innerHtml === 'string' ? part.innerHtml : '';
+      if (/Paragraph/.test(type)) {
+        const p = paragraph(html);
+        if (p) blocks.push({ type: 'paragraph', ...p });
+      } else if (/Heading|Subhead/.test(type)) {
+        const h = paragraph(html);
+        if (h) blocks.push({ type: 'heading', text: h.text });
+      } else if (/List(Content)?$/.test(type) && html) {
+        for (const item of new doc.defaultView.DOMParser().parseFromString(html, 'text/html').querySelectorAll('li')) {
+          const p = paragraph(item.innerHTML, '\u2022 ');
+          if (p) blocks.push({ type: 'paragraph', ...p });
+        }
+      } else if (/Blockquote/.test(type) && html) {
+        const p = paragraph(html);
+        if (p) blocks.push({ type: 'paragraph', ...p });
+      } else if (/Image|Photo|Gallery|Video|Embed|Audio|Interactive|Chart/.test(type)) left++;
+      // Else not the article's: related links, pull quotes, newsletter boxes
+    }
+    const paragraphs = blocks.filter(b => b.type === 'paragraph');
+    if (paragraphs.length < 3) return null;
+    return { blocks, paragraphs: paragraphs.length, chars: paragraphs.reduce((n, b) => n + b.text.length, 0), left, leftAs: ['photo or graphic', 'photos or graphics'] };
+  }
+
   const site = {
     id: 'atlantic',
     name: 'The Atlantic',
@@ -35,6 +89,7 @@
       story: 'main#main-content > article',
       main: 'main#main-content',
       upsellLink: null,
+      fromPage: articleFromPage, // the whole text, if the page was sent it
       wall: {
         // The JSON-LD marks the article paywalled, and the body is cut short (shared check).
         detect: adapter.cutBody({ body: BODY, maxWords: CUT_WORDS }),

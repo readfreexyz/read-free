@@ -32,6 +32,104 @@
   };
 
   const PINNED = 'main#site-content[style*="position: fixed"]';
+
+  // The whole article, from the data NYT sends with its page (window.__preloadedData, an inline
+  // script): since Nov 2026 the page is cut in the browser (config.isOptimisticallyTruncated), and the
+  // rest of the text is all there. In the user's Chrome, 2026-11-25, 5 articles of 5: 1,164 words of
+  // NYT's own count of 1,160; 1,360 of 1,347; 1,776 of 1,738; 995 of 976; 3,079 of 3,059. So there's
+  // nothing to ask archive.today for.
+  const DATA = /^\s*window\.__preloadedData\s*=\s*/;
+  function pageData(doc) {
+    const script = [...doc.scripts].find(s => DATA.test(s.textContent.slice(0, 80)));
+    if (!script) return null;
+    const text = script.textContent.replace(DATA, '').replace(/;?\s*$/, '');
+    // A JavaScript object rather than JSON: some values are undefined (never inside a string, which
+    // the first half of the pattern steps over)
+    try {
+      return JSON.parse(text.replace(/"(?:[^"\\]|\\.)*"|\bundefined\b/g, m => (m === 'undefined' ? 'null' : m)));
+    } catch {
+      return null;
+    }
+  }
+  const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const webAddress = href => {
+    try {
+      const url = new URL(href, 'https://www.nytimes.com');
+      return /^https?:$/.test(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
+  };
+  function runs(content) {
+    const out = [];
+    let spaced = true; // the text so far ends in a space (or there's none)
+    for (const inline of content || []) {
+      let text = inline?.__typename === 'LineBreakInline' ? ' ' : typeof inline?.text === 'string' ? inline.text : '';
+      text = text.replace(/\s+/g, ' ');
+      if (spaced) text = text.replace(/^ /, '');
+      if (!text) continue;
+      spaced = text.endsWith(' ');
+      const run = { text };
+      for (const format of inline.formats || []) {
+        if (format?.__typename === 'LinkFormat') run.href = webAddress(format.url) || undefined;
+        if (format?.__typename === 'ItalicFormat') run.em = true;
+        if (format?.__typename === 'BoldFormat') run.strong = true;
+      }
+      if (!run.href) delete run.href;
+      out.push(run);
+    }
+    if (out.length) out[out.length - 1].text = out[out.length - 1].text.replace(/ $/, '');
+    return out.filter(run => run.text);
+  }
+  function photo(media) {
+    const all = (media?.crops || []).flatMap(crop => crop?.renditions || []).filter(r => /^https:\/\/static\d*\.nyt\.com\//.test(r?.url));
+    const named = name => all.find(r => r.name === name)?.url;
+    const src = named('articleLarge') || named('jumbo') || named('superJumbo');
+    if (!src) return null;
+    const figure = { type: 'figure', src, alt: clean(media.altText), caption: clean([media.caption?.text, media.credit].filter(Boolean).join(' ')) };
+    const hires = named('superJumbo') || named('jumbo');
+    if (hires && hires !== src) figure.hires = hires;
+    return figure;
+  }
+  // { blocks, paragraphs, chars, left } as extract.js makes them, or null if the data isn't there, is
+  // for another article (NYT can show one without loading a page), or doesn't hold it all. left: how
+  // many graphics, videos and embeds it has that can't be drawn from it.
+  function articleFromPage(doc) {
+    const article = pageData(doc)?.loaderData?.data?.article;
+    const content = article?.sprinkledBody?.content;
+    if (!Array.isArray(content)) return null;
+    let path = '';
+    try { path = new URL(article.url, 'https://www.nytimes.com').pathname; } catch { /* no address */ }
+    if (path !== doc.location?.pathname) return null;
+    const blocks = [];
+    let left = 0;
+    const paragraph = (inlines, prefix = '') => {
+      const list = prefix && inlines.length ? [{ text: prefix }, ...inlines] : inlines;
+      const text = clean(list.map(run => run.text).join(''));
+      if (text) blocks.push({ type: 'paragraph', text, inlines: list });
+    };
+    const add = (block, prefix = '') => {
+      const type = block?.__typename || '';
+      if (type === 'ParagraphBlock' || type === 'DetailBlock') paragraph(runs(block.content), prefix);
+      else if (/^Heading\dBlock$/.test(type)) {
+        const text = clean(runs(block.content).map(run => run.text).join(''));
+        if (text) blocks.push({ type: 'heading', text });
+      } else if (type === 'ListBlock') (block.content || []).forEach((item, i) => (item?.content || []).forEach(b => add(b, /ordered|number|decimal/i.test(block.style || '') && !/unordered/i.test(block.style) ? `${i + 1}. ` : '\u2022 ')));
+      else if (type === 'BlockquoteBlock') (block.content || []).forEach(b => add(b));
+      else if (type === 'ImageBlock') { const figure = photo(block.media); if (figure) blocks.push(figure); }
+      else if (type === 'DiptychBlock') for (const media of [block.imageOne, block.imageTwo]) { const figure = photo(media); if (figure) blocks.push(figure); }
+      else if (type === 'GridBlock') for (const item of block.gridMedia || block.media || []) { const figure = photo(item?.media || item); if (figure) blocks.push(figure); }
+      else if (/Interactive|Video|Slideshow|Embed|Audio|Map|Unstructured/.test(type)) left++;
+      // Else not the article's: ad slots (Dropzone), the header, related links, rules, pull quotes
+    };
+    content.forEach(block => add(block));
+    const prose = blocks.filter(b => b.type === 'paragraph' || b.type === 'heading');
+    const paragraphs = blocks.filter(b => b.type === 'paragraph');
+    const words = prose.map(b => b.text).join(' ').split(/\s+/).filter(Boolean).length;
+    // Whole, by NYT's own count (its words come out a little over)
+    if (paragraphs.length < 3 || !(article.wordCount > 0) || words < article.wordCount * 0.95) return null;
+    return { blocks, paragraphs: paragraphs.length, chars: paragraphs.reduce((n, b) => n + b.text.length, 0), left };
+  }
   const news = {
     id: 'nyt',
     name: 'The New York Times',
@@ -52,6 +150,7 @@
       story: 'article#story',             // fallback home for the banner and text
       main: 'main#site-content',          // the page content: scroll anchor, scope for the upsell line
       upsellLink: 'a[href*="/subscription"]', // "Subscribe to The Times…" line under cut-off text
+      fromPage: articleFromPage, // the whole text, if the page was sent it
       wall: {
         popup: '#gateway-content',        // filled while a wall is up (hidden by nyt.css)
         // NYT makes the page inert under a wall: main until Nov 2026, and since then the article

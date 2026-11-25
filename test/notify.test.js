@@ -58,14 +58,19 @@ test('the donation link: after 10 articles on 3 days, never with a reason, every
   assert.equal(notify.plan(gave, { site: 'newyorker', article: 'b', outcome: 'lifted', reason: null, tip: TIP, now: NOW + 100 * D }).donate, null, 'clicked through: half a year');
 });
 
-test("quiet once there's nothing new: no notification for a regular reader's lifted wall, unless they ask for one", () => {
-  const quiet = { ...REGULAR, donate: { lastAskAt: NOW - D } };
-  assert.equal(at(quiet).show, false);
-  assert.equal(at(quiet, { alwaysConfirm: true }).show, true);
-  assert.equal(at({ ...quiet, fixed: 2 }).show, true, 'the first five articles');
-  assert.equal(at(quiet, { outcome: 'swapped' }).show, true, 'they watched archive.today load');
-  assert.equal(at({ ...quiet, fixed: 2, articles: ['https://www.nytimes.com/a'] }).show, false, 'a reload says nothing new');
-  assert.equal(at({ ...quiet, fixed: 2, articles: ['https://www.nytimes.com/a'] }, { alwaysConfirm: true }).show, false);
+test('a notification every time a wall comes off, reloads too; with quiet on, only when there is something new', () => {
+  const regular = { ...REGULAR, donate: { lastAskAt: NOW - D } };
+  const reload = { ...regular, articles: ['https://www.nytimes.com/a'] };
+  for (const outcome of ['lifted', 'page', 'saved', 'swapped', 'partial']) {
+    assert.equal(at(regular, { outcome }).show, true, outcome);
+    assert.equal(at(reload, { outcome }).show, true, `${outcome}, a reload`);
+  }
+  const quiet = (state, options) => at(state, { quiet: true, ...options }).show;
+  assert.equal(quiet(regular), false);
+  assert.equal(quiet(regular, { outcome: 'page' }), false);
+  assert.equal(quiet({ ...regular, fixed: 2 }), true, 'the first five articles');
+  assert.equal(quiet(regular, { outcome: 'swapped' }), true, 'they watched archive.today load');
+  assert.equal(quiet({ ...regular, fixed: 2, articles: ['https://www.nytimes.com/a'] }), false, 'a reload says nothing new');
 });
 
 // A newer version out (src/release.js), as the service worker reports it

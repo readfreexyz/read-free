@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const settings = require('../extension/src/settings.js');
 const { memoryArea } = require('./fixtures.js');
 
-const DEFAULTS = { mirror: 'archive.ph', enabled: true, disabledSites: [], alwaysConfirm: false, donated: false };
+const DEFAULTS = { mirror: 'archive.ph', enabled: true, disabledSites: [], quiet: false, donated: false };
 
 test('defaults: archive.ph, on everywhere', async () => {
   assert.deepEqual(await settings.load(memoryArea()), DEFAULTS);
@@ -51,8 +51,8 @@ test('only true, false and site ids are kept', async () => {
   assert.deepEqual(settings.normalize({ enabled: 'no', disabledSites: ['nyt', 7, '<b>', 'nyt', ''] }), { ...DEFAULTS, disabledSites: ['nyt'] });
   assert.deepEqual(settings.normalize({ disabledSites: 'nyt' }), DEFAULTS);
   assert.deepEqual(settings.normalize(null), DEFAULTS);
-  assert.equal(settings.normalize({ alwaysConfirm: 'yes' }).alwaysConfirm, false);
-  assert.equal(settings.normalize({ alwaysConfirm: true }).alwaysConfirm, true);
+  assert.equal(settings.normalize({ quiet: 'yes' }).quiet, false);
+  assert.equal(settings.normalize({ quiet: true }).quiet, true);
 });
 
 test('onChange: only the sync area\'s settings, normalized', () => {

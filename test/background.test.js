@@ -473,7 +473,7 @@ test('after a CAPTCHA nothing more is asked, by any page, until the reader asks;
   assert.equal(again.replies.fourth.ok, true);
 });
 
-test('a check is forgotten after ten minutes; another address has none; a failure neither sets nor clears one', async () => {
+test('a check is forgotten after a minute; another address has none; a failure neither sets nor clears one', async () => {
   const session = memoryArea();
   const a = archiveWorker({ session, answer: async name => (name === 'first' ? CAPTCHA : name === 'broken' ? new TypeError('Failed to fetch') : 'text') });
   a.ask('first', 1);
@@ -487,7 +487,7 @@ test('a check is forgotten after ten minutes; another address has none; a failur
   down.ask('down', 1, { force: true });
   await pause(40);
   assert.equal(await down.wanted(), true, 'a server error is no answer');
-  session.data['nytfix:checks']['archive.ph'].at -= 10 * 60 * 1000 + 1;
+  session.data['nytfix:checks']['archive.ph'].at -= 60 * 1000 + 1;
   const later = archiveWorker({ session });
   assert.equal(await later.wanted(), false);
 });
