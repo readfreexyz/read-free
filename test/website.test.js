@@ -1,7 +1,8 @@
 // The site's front page (website/index.html): its outlets are the extension's live sites, it loads
 // nothing from elsewhere, its link-preview picture is beside it, its script is the one its CSP
-// allows, tools/release.sh fills each of its fields, and its install command follows the address
-// it's served from only when that's plain.
+// allows, tools/release.sh fills each of its fields, its install command follows the address
+// it's served from only when that's plain, and each visitor sees one way at a time (which shows is
+// worked out from the page's own CSS).
 // test/install.test.js checks a page release.sh built.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -90,10 +91,10 @@ const variant = without => PAGE.split('\n').reduce(({ out, skip }, line) => {
   return { out: skip || /^ *<!-- \/?(firefox|chrome-only) -->$/.test(line) ? out : [...out, line], skip };
 }, { out: [], skip: false }).out.join('\n');
 
-test('Firefox: a card with its file, and the words; or none of it in a release for Chrome alone', () => {
+test('Firefox: its part, with its file, and the words; or none of it in a release for Chrome alone', () => {
   const words = d => d.querySelector('.lede').textContent.replace(/\s+/g, ' ');
   const withIt = new JSDOM(variant('chrome-only')).window.document;
-  assert.equal(withIt.querySelector('#firefox a.download').getAttribute('href'), '{{xpi}}');
+  assert.equal(withIt.querySelector('section[data-for="firefox"] a.download').getAttribute('href'), '{{xpi}}');
   assert.match(words(withIt), /Read Free is an extension for Chrome and Firefox on your computer that gets you past/);
   assert.match(withIt.querySelector('.phone').textContent.replace(/\s+/g, ' '), /works in Chrome or Firefox on a computer/);
   const without = new JSDOM(variant('firefox')).window.document;
@@ -117,65 +118,152 @@ const load = (url, clipboard) => new JSDOM(built, {
 }).window.document;
 const at = site => `curl -fsSLO ${site}install.sh && sh install.sh`;
 
-test("only what's for the visitor's browser and system is shown; the rest in a closed section, all of it there", () => {
-  const AGENTS = {
-    firefoxMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:160.0) Gecko/20100101 Firefox/160.0',
-    firefoxWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0',
-    chromeMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
-    chromeWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
-    chromeLinux: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
-    chromebook: 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
-    firefoxAndroid: 'Mozilla/5.0 (Android 15; Mobile; rv:160.0) Gecko/160.0 Firefox/160.0',
-    iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Mobile/15E148 Safari/604.1',
-  };
-  const open = (page, agent, hash = '') => new JSDOM(page, {
-    url: `https://site.example/${hash}`, runScripts: agent ? 'dangerously' : undefined,
-    beforeParse(win) { if (agent) Object.defineProperty(win.navigator, 'userAgent', { value: agent }); },
-  }).window.document;
-  // Each card, with "+" when it goes across; those in the closed section in brackets
-  const names = cards => [...cards].map(c => c.id + (c.classList.contains('wide') ? '+' : '')).join(' ');
-  const order = (page, agent) => {
-    const doc = open(page, agent);
-    const more = doc.querySelector('.ways > details');
-    if (more) assert.equal(more.open, false, 'closed');
-    return names(doc.querySelectorAll('main .ways:not(details .ways) > .card')) + (more ? ` (${names(more.querySelectorAll('.ways > .card'))})` : '');
-  };
+// Which parts of the page show, by the page's own CSS: the selectors in its @supports block
+const HIDES = PAGE.match(/@supports selector\(:has\(a\)\) \{([\s\S]*?)\n    \}/)[1].match(/main:has[\s\S]*?(?= \{)/)[0].split(',\n').map(s => s.trim());
+const shows = el => !HIDES.some(hides => el.closest(hides)) && !el.closest('.all') && !el.closest('[hidden]');
+const shown = (doc, selector) => [...doc.querySelectorAll(selector)].filter(shows);
+// What a section says, as shown (closed details too)
+const said = (doc, selector) => {
+  const copy = doc.querySelector(selector).cloneNode(true);
+  const all = [...doc.querySelector(selector).querySelectorAll('*')];
+  [...copy.querySelectorAll('*')].map((el, i) => [el, all[i]]).filter(([, was]) => !shows(was)).forEach(([el]) => el.remove());
+  return copy.textContent.replace(/\s+/g, ' ').trim();
+};
+const AGENTS = {
+  firefoxMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:160.0) Gecko/20100101 Firefox/160.0',
+  firefoxWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0',
+  chromeMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+  chromeWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+  edgeWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0',
+  chromeLinux: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+  chromebook: 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+  safari: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Safari/605.1.15',
+  firefoxAndroid: 'Mozilla/5.0 (Android 15; Mobile; rv:160.0) Gecko/160.0 Firefox/160.0',
+  chromeAndroid: 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36',
+  iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Mobile/15E148 Safari/604.1',
+};
+const visit = (page, agent, hash = '') => new JSDOM(page, {
+  url: `https://site.example/${hash}`, runScripts: agent ? 'dangerously' : undefined,
+  beforeParse(win) { if (agent) Object.defineProperty(win.navigator, 'userAgent', { value: AGENTS[agent] }); },
+}).window.document;
+const picked = d => ['system', 'way'].map(name => [...d.querySelectorAll(`input[name="${name}"]:checked`)].map(r => r.id).join());
+const choose = (d, id) => { d.getElementById(id).checked = true; return d; };
+
+test("the visitor's browser and computer, picked for them", () => {
   const withIt = variant('chrome-only');
-  const plain = 'mac windows firefox update';
-  assert.equal(order(withIt), plain, 'without the script: everything shows, Firefox after Chrome');
-  for (const agent of ['firefoxMac', 'firefoxWindows']) assert.equal(order(withIt, AGENTS[agent]), 'firefox+ (mac windows update+)', agent);
-  for (const agent of ['chromeMac', 'chromeLinux']) assert.equal(order(withIt, AGENTS[agent]), 'mac+ update+ (windows firefox)', agent);
-  assert.equal(order(withIt, AGENTS.chromeWindows), 'windows+ update+ (mac firefox)');
-  for (const agent of ['chromebook', 'firefoxAndroid', 'iphone']) assert.equal(order(withIt, AGENTS[agent]), plain, agent);
-  // A release for Chrome alone
   const without = variant('firefox');
-  assert.equal(order(without), 'mac windows update+');
-  assert.equal(order(without, AGENTS.firefoxMac), 'mac windows update+', 'no Firefox card to show alone');
-  assert.equal(order(without, AGENTS.chromeWindows), 'windows+ update+ (mac+)');
-  // A link to a card opens the section it's in (the extension links to #update)
-  const isOpen = (agent, hash) => open(withIt, AGENTS[agent], hash).querySelector('.ways > details').open;
-  assert.equal(isOpen('firefoxMac', '#update'), true);
-  assert.equal(isOpen('chromeMac', '#firefox'), true);
-  assert.equal(isOpen('chromeMac', '#update'), false, 'shown already');
-  assert.equal(isOpen('chromeMac', '#load'), false);
-  // Step 2 is Chrome's: in Firefox it goes with Chrome's cards, and Firefox's own card keeps the
-  // line that says Read Free is installed
-  const step2 = d => d.getElementById('load').closest('section');
-  const firefox = open(withIt, AGENTS.firefoxMac);
-  assert.ok(step2(firefox).closest('details'), 'in the closed section');
-  assert.equal(firefox.getElementById('installed').closest('.card').id, 'firefox');
-  assert.equal(firefox.getElementById('installed').hidden, true, 'the extension shows it');
-  assert.equal(firefox.getElementById('chrome-step').hidden, true);
-  assert.equal(firefox.querySelector('#get .number').hidden, true, 'no lone 1');
-  assert.equal(isOpen('firefoxMac', '#load'), true);
-  for (const d of [open(withIt, AGENTS.chromeMac), open(withIt, AGENTS.iphone), open(withIt), open(without, AGENTS.firefoxMac)]) {
-    assert.equal(step2(d).closest('details'), null);
-    assert.ok(step2(d).contains(d.getElementById('installed')));
-    assert.equal(d.getElementById('chrome-step')?.hidden ?? false, false);
+  const system = (page, agent) => picked(visit(page, agent))[0];
+  assert.equal(system(withIt), 'mac', 'without the script');
+  assert.equal(system(withIt, 'chromeMac'), 'mac');
+  for (const agent of ['chromeWindows', 'edgeWindows']) assert.equal(system(withIt, agent), 'windows', agent);
+  assert.equal(system(withIt, 'chromeLinux'), 'linux');
+  assert.equal(system(withIt, 'chromebook'), 'chromebook');
+  for (const agent of ['firefoxMac', 'firefoxWindows']) assert.equal(system(withIt, agent), 'firefox', agent);
+  for (const agent of ['firefoxAndroid', 'chromeAndroid', 'iphone']) assert.equal(system(withIt, agent), 'mac', `${agent}: as it is in the page`);
+  assert.equal(system(without, 'firefoxWindows'), 'windows', 'no Firefox to pick');
+  // The way that updates itself, first
+  for (const agent of [undefined, ...Object.keys(AGENTS)]) assert.equal(picked(visit(withIt, agent))[1], 'way-line');
+  // A choice made before is the browser's to bring back (on Back): nothing here stops it, and
+  // the script doesn't pick over it
+  assert.equal(visit(withIt).querySelectorAll('input[autocomplete]').length, 0);
+  assert.equal(system(withIt.replace('<script>', "<script>document.getElementById('linux').checked = true;</script><script>"), 'chromeWindows'), 'linux');
+  // Safari runs neither
+  for (const agent of Object.keys(AGENTS)) assert.equal(visit(withIt, agent).getElementById('safari').hidden, agent !== 'safari', agent);
+});
+
+test('two ways, one or the other: the choice says so, and only the chosen one shows', () => {
+  const page = variant('chrome-only');
+  for (const [system, agent] of [['mac', 'chromeMac'], ['windows', 'chromeWindows'], ['linux', 'chromeLinux'], ['mac', undefined]]) {
+    const d = visit(page, agent);
+    assert.match(said(d, '.choice'), /^There are two ways\. Choose one: .* or Download a file/, system);
+    assert.equal(shown(d, '.choice input[type="radio"]').length, 2);
+    for (const [way, other] of [['line', 'file'], ['file', 'line']]) {
+      choose(d, `way-${way}`);
+      assert.ok(shown(d, `[data-way="${way}"]`).length >= 2, `${system}, ${way}: getting it and adding it`);
+      assert.deepEqual(shown(d, `[data-way="${other}"]`), [], `${system}, ${way}: nothing of the other way`);
+      assert.equal(shown(d, '.command').length, way === 'line' ? 1 : 0, `${system}, ${way}: one command or none`);
+      assert.equal(shown(d, 'a.download[href="{{zip}}"]').length, way === 'file' ? 1 : 0, `${system}, ${way}: one download or none`);
+      // Adding it to Chrome names the folder that way gives, and only that one
+      const add = said(d, 'section[aria-labelledby="load"]');
+      const folder = { line: system === 'linux' ? /read-free\/extension/ : /the window with the extension folder/, file: /Choose the Read Free folder in Documents/ };
+      assert.match(add, folder[way], `${system}, ${way}`);
+      assert.doesNotMatch(add, folder[other], `${system}, ${way}`);
+    }
   }
-  // The commands and Copy buttons work wherever their card is
-  const doc = open(withIt, AGENTS.chromeMac);
-  assert.ok(doc.querySelector('details #command-win') && doc.querySelector('#command'));
+  // A Chromebook has one way, whichever was picked before
+  const chromebook = visit(page, 'chromebook');
+  for (const way of ['way-line', 'way-file']) {
+    choose(chromebook, way);
+    assert.deepEqual(shown(chromebook, '.choice'), []);
+    assert.deepEqual(shown(chromebook, '[data-way="line"]'), []);
+    assert.equal(shown(chromebook, 'a.download[href="{{zip}}"]').length, 1);
+  }
+  // In a browser that shows everything, the second way's heading says "or" too
+  assert.deepEqual([...visit(page).querySelectorAll('h3')].map(h => h.textContent), ['The first way: Paste one line', 'Or the second way: Download a file']);
+  // So does each way's step for adding it to Chrome
+  for (const li of visit(page).querySelectorAll('#load ~ .card > .steps > li[data-way]')) {
+    assert.match(li.querySelector('.all').textContent, li.dataset.way === 'line' ? /^If you pasted the line/ : /^Or, if you downloaded the file/);
+  }
+  // Where one shows, its steps are under the way's own name
+  assert.deepEqual(shown(choose(visit(page), 'way-file'), 'h3').map(h => h.lastChild.textContent), ['Download a file']);
+});
+
+test("each computer's own steps, and none of another's", () => {
+  const page = variant('chrome-only');
+  const WORDS = { mac: /Terminal|Finder|Command/, windows: /PowerShell|File Explorer|Extract All|Windows key/, linux: /On Linux|Open a terminal|Ctrl and L/, chromebook: /Files app|My files/ };
+  for (const system of ['mac', 'windows', 'linux', 'chromebook']) {
+    for (const way of ['way-line', 'way-file']) {
+      const d = choose(choose(visit(page), system), way);
+      const words = said(d, 'section[aria-labelledby="get"]') + said(d, 'section[aria-labelledby="load"]');
+      for (const [other, re] of Object.entries(WORDS)) if (other !== system) assert.doesNotMatch(words, re, `${system}, ${way}: nothing of ${other}'s`);
+      assert.match(words, /Developer mode/);
+      assert.doesNotMatch(words, /Add to Firefox/);
+      // The key has one name there
+      assert.doesNotMatch(words, system === 'mac' ? /\bEnter\b/ : /\bReturn\b/, system);
+      // Every list of steps has some, in the order of the page
+      for (const list of shown(d, '.steps')) assert.ok([...list.children].some(shows), `${system}, ${way}: no empty list`);
+    }
+  }
+  // The zip unzips to a folder called Read Free, so nobody has to rename one
+  for (const a of visit(page).querySelectorAll('a[href="{{zip}}"]')) assert.equal(a.getAttribute('download'), 'Read Free.zip');
+});
+
+test("in Firefox: its button, and none of Chrome's steps", () => {
+  const page = variant('chrome-only');
+  for (const agent of ['firefoxMac', 'firefoxWindows']) {
+    const d = visit(page, agent);
+    assert.deepEqual(shown(d, 'main section').map(s => s.getAttribute('aria-labelledby')), ['add', 'done', 'updates', 'outlets']);
+    assert.equal(shown(d, 'a.download').length, 1);
+    assert.doesNotMatch(said(d, 'main section[aria-labelledby="updates"]'), /download/);
+    assert.ok(!d.getElementById('installed').closest('[data-for]'), 'where Read Free says it is installed');
+  }
+  const chrome = visit(page, 'chromeMac');
+  assert.deepEqual(shown(chrome, 'main section').map(s => s.getAttribute('aria-labelledby')), ['get', 'load', 'done', 'updates', 'outlets']);
+  // Every part named there is on the page
+  for (const d of [chrome, visit(variant('firefox'))]) for (const s of d.querySelectorAll('section')) assert.ok(d.getElementById(s.getAttribute('aria-labelledby')), s.getAttribute('aria-labelledby'));
+});
+
+test('links to a part of the page: the installers open #load, the extension links to #update', () => {
+  const page = variant('chrome-only');
+  // After the installer: Chrome's steps for the folder it made
+  for (const [agent, system] of [['chromeMac', 'mac'], ['chromeWindows', 'windows'], ['firefoxWindows', 'windows'], ['firefoxMac', 'mac']]) {
+    const d = visit(page, agent, '#load');
+    assert.deepEqual(picked(d), [system, 'way-line'], agent);
+    assert.ok(shows(d.getElementById('load')), agent);
+  }
+  // A copy loaded by hand: how to update it, open
+  const open = (agent, hash) => visit(page, agent, hash).querySelector('#update details').open;
+  assert.equal(open('chromeMac', '#update'), true);
+  assert.equal(open('chromebook', '#update'), true);
+  assert.equal(open('chromeMac', ''), false);
+  assert.equal(open('chromeMac', '#load'), false);
+  const update = visit(page, 'chromeWindows', '#update').querySelector('#update details');
+  assert.ok(shows(update) && shows(update.querySelector('a[href="{{zip}}"]')));
+  // A browser and computer by name
+  assert.equal(picked(visit(page, 'chromeMac', '#windows'))[0], 'windows');
+  assert.equal(picked(visit(page, 'chromeMac', '#firefox'))[0], 'firefox');
+  assert.equal(picked(visit(page, 'firefoxMac', '#firefox'))[0], 'firefox');
+  assert.equal(picked(visit(page, 'chromeMac', '#nothing'))[0], 'mac');
 });
 
 test('the install command: from the address the page is served from, if that is plain https', () => {
@@ -221,5 +309,11 @@ test('Copy: shown only with a clipboard, and copies the command', async () => {
   copyExt.click();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(copied[2], 'chrome://extensions');
+  // The folders the installers use (install.sh's and install.ps1's)
+  for (const [id, path] of [['copy-path-mac', '~/Library/Application Support/Read Free/extension'], ['copy-path-win', '%LOCALAPPDATA%\\Read Free'], ['copy-path-linux', '~/.local/share/read-free/extension']]) {
+    page.getElementById(id).click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(copied.at(-1), path);
+  }
   page.defaultView.close();
 });

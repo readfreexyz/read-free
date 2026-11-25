@@ -26,7 +26,10 @@ whether the site may install an add-on, then shows what Read Free may do. It upd
 an update adds a site, the toolbar icon shows a `!`, and Settings has a button to allow it
 ([docs/firefox.md](docs/firefox.md)). The rest of this section is for Chrome.
 
-**With the install script** (macOS and Linux): it installs the newest signed release and keeps
+**In Chrome**, get it one of two ways, the install script or the zip, then add it to Chrome.
+[readfree.xyz](https://readfree.xyz) shows the steps for your computer, with pictures.
+
+**One way: the install script** (macOS and Linux). It installs the newest signed release and keeps
 it up to date, checking every hour ([docs/auto-update.md](docs/auto-update.md)).
 
 ```bash
@@ -40,15 +43,22 @@ with an hourly Task Scheduler task, "Read Free updater".
 irm https://readfree.xyz/install.ps1 -OutFile install.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-Then, once, in Chrome (or Edge, Brave, Vivaldi, Dia: in Dia the page is `dia://extensions`):
+**Or the other way: the zip** (any system), from [readfree.xyz](https://readfree.xyz). Unzip it, and
+move the **Read Free** folder where it can stay, such as Documents. Or clone this repository and use
+its **`extension/`** folder (not the project root: Chrome rejects it because `node_modules` contains
+files starting with `_`). It won't update itself: it says when a new version is out (in the toolbar
+menu, by a ↑ on its icon, and now and then in the status bar).
+
+**Then, either way,** once, in Chrome (or Edge, Brave, Vivaldi, Dia: in Dia the page is `dia://extensions`):
 
 1. Go to `chrome://extensions` and turn on **Developer mode** (top right). Leave it on: with it
    off, Chrome turns Read Free off when it updates itself.
-2. Drag the folder onto that page: the script opens it selected, in Finder on a Mac or File
-   Explorer on Windows (it's called `extension`); Chrome loads a folder dropped there once
-   Developer mode is on. Or click **Load unpacked** and pick the folder the script printed. The
+2. With the script: drag the folder onto that page. The script opens it selected, in Finder on a
+   Mac or File Explorer on Windows (it's called `extension`); Chrome loads a folder dropped there
+   once Developer mode is on. Or click **Load unpacked** and pick the folder the script printed. The
    script copies its path: on a Mac, press Cmd+Shift+G in that window and paste it; on Windows,
-   paste it into the Folder box and click Select Folder.
+   paste it into the Folder box and click Select Folder. With the zip: click **Load unpacked** and
+   pick the Read Free folder.
 3. Read Free's watermelon shows in the toolbar, next to the address bar. If it doesn't, click the
    puzzle piece there and pin **Read Free**.
 4. Reload any tabs that were already open.
@@ -56,12 +66,6 @@ Then, once, in Chrome (or Edge, Brave, Vivaldi, Dia: in Dia the page is `dia://e
 Read Free then opens a welcome page (once, never on an update), and the site's front page says
 it's installed and which version (`extension/src/site-mark.js`, which only writes that line into
 the page). The site shows each Chrome step with a picture.
-
-**By hand** (any system): unzip a release and pick the unzipped folder, or clone this repository
-and pick its **`extension/`** folder (not the project root: Chrome rejects it because
-`node_modules` contains files starting with `_`). Then do the same. It won't update itself: it
-says when a new version is out (in the toolbar menu, by a ↑ on its icon, and now and then in the
-status bar).
 
 To test the paywalled case, open the extension's **Details** and turn on **Allow in Incognito**.
 Then use an incognito window, which isn't signed in to NYT.
@@ -361,7 +365,7 @@ daily check on GitHub (`.github/workflows/site-health.yml`), and readers' report
 | `extension/give/` | The donation page: what you withheld, UNRWA's link, and the ways to give to Read Free (Ko-fi's donation panel, other links). |
 | `website/_headers` | Makes Cloudflare send `Access-Control-Allow-Origin: *` with every file of the site, so the extension can read `latest.txt` and `donate.json`. |
 | `website/donate.json` | The list of ways to give, to publish on Read Free's site (see [Donating](#donating)). |
-| `website/index.html` | The site's front page: the install command, the zip, the steps in Chrome and the outlets, and a note for visitors on a phone. `tools/release.sh build` writes the release in (see [docs/auto-update.md](docs/auto-update.md)). |
+| `website/index.html` | The site's front page: the steps for the visitor's browser and computer (the install command or the zip, one at a time), the outlets, and a note for visitors on a phone. `tools/release.sh build` writes the release in (see [docs/auto-update.md](docs/auto-update.md)). |
 | `website/og.png` | The picture apps show when the site's link is shared (the page's `og:image`). Drawn from `brand/og.svg`: `rsvg-convert -w 1200 -h 630 brand/og.svg -o website/og.png`. |
 | `website/install.sh` | Installs the newest signed release on macOS or Linux and updates it every hour (see [docs/auto-update.md](docs/auto-update.md)). |
 | `website/install.ps1` | The same for Windows, in Windows PowerShell 5.1: installs the newest signed release (checked by Windows' own OpenSSH) and updates it every hour from Task Scheduler. `tools/release.sh` writes install.sh's key and addresses into it; `.github/workflows/windows-installer.yml` runs it for real on a GitHub Windows machine (`test/windows/`). |
