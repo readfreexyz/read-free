@@ -8,6 +8,12 @@
   const MIRRORS = ['archive.ph', 'archive.is', 'archive.today', 'archive.md', 'archive.li', 'archive.vn', 'archive.fo'];
   const DEFAULT_MIRROR = 'archive.ph';
 
+  // The address to ask when `mirror` can't be connected to. archive.today only redirects to
+  // archive.ph, so archive.is stands in for both; archive.ph stands in for the others.
+  function secondMirror(mirror = DEFAULT_MIRROR) {
+    return mirror === 'archive.ph' || mirror === 'archive.today' ? 'archive.is' : 'archive.ph';
+  }
+
   // The newest snapshot itself: archive.today looks the article up and redirects to it
   // (https://archive.ph/20261112214313/<article>), or answers 404 if it has none. One request
   // instead of the timemap plus the snapshot.
@@ -81,7 +87,7 @@
   }
 
   const archive = {
-    MIRRORS, DEFAULT_MIRROR,
+    MIRRORS, DEFAULT_MIRROR, secondMirror,
     newestUrl, timemapUrl, mementoAt, searchUrl, parseTimemap, newestFirst, toMirror, isArchiveUrl, looksBlocked,
   };
   root.NYTFix = Object.assign(root.NYTFix || {}, { archive });

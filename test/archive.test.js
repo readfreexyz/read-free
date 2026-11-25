@@ -75,3 +75,16 @@ test("mementoAt reads a snapshot's time from its address, and only from an archi
   assert.equal(archive.mementoAt('http://archive.ph/20261112214313/https://www.theatlantic.com/x/1/'), null, 'https only');
   assert.equal(archive.mementoAt('not a url'), null);
 });
+
+test('secondMirror: another permitted address, never one that only redirects to the first', () => {
+  const { secondMirror, MIRRORS } = archive;
+  for (const mirror of MIRRORS) {
+    assert.ok(MIRRORS.includes(secondMirror(mirror)), mirror);
+    assert.notEqual(secondMirror(mirror), mirror);
+  }
+  assert.equal(secondMirror(), 'archive.is');
+  assert.equal(secondMirror('archive.today'), 'archive.is', 'archive.today redirects to archive.ph');
+  assert.equal(secondMirror('archive.is'), 'archive.ph');
+  const manifest = require('../extension/manifest.json');
+  for (const mirror of MIRRORS) assert.ok(manifest.host_permissions.includes(`https://${secondMirror(mirror)}/*`), mirror);
+});

@@ -32,6 +32,10 @@
   // tests have seen 45 s and once 73 s. Once rendered, it answers in well under a second.
   // Also the limit for /newest/, which looks the article up (0.4–12 s seen) and then renders.
   const SNAPSHOT_TIMEOUT_MS = 90000;
+  // After two addresses that took longer than this, together, not to answer, the reader is told,
+  // rather than kept waiting for a third request that would most likely go the same way.
+  const GIVE_UP_AFTER_MS = 30000;
+  const FIND_STAGE = { expectedMs: 1500, slowAfterMs: 8000, slowLabel: 'archive.today is slow to answer. Still waiting…' };
   const DOWNLOAD_STAGE = { expectedMs: 9000, slowAfterMs: 20000, slowLabel: 'archive.today is slow right now. Still waiting…' };
   // How many snapshots to try when newer ones are incomplete. Each can be a cold 8–15 s
   // render on archive.today's side, so keep it small.
@@ -385,12 +389,17 @@
   }
 
   // blocked: archive.today wants a CAPTCHA or is rate-limiting, so asking it another way won't help.
+  // unreachable: no answer at all from that address (background.js), so another one may do.
+  // timedOut: no whole answer in the time it was given.
   class FixError extends Error {
-    constructor(message, { blocked = false } = {}) {
+    constructor(message, { blocked = false, unreachable = false, timedOut = false } = {}) {
       super(message);
       this.blocked = blocked;
+      this.unreachable = unreachable;
+      this.timedOut = timedOut;
     }
   }
+  const noAnswer = hosts => `Couldn't connect to ${hosts.length > 1 ? `archive.today: neither ${hosts.join(' nor ')} answered` : hosts[0]}. It may be down for a moment, or your network may be blocking it. Wait a minute and try again.`;
 
   const dismiss = { text: 'Dismiss', onClick: () => render.removeBanner(document) };
   // Fetch the article from archive.today again, after a failure (a network hiccup, a slow
@@ -427,7 +436,12 @@
     }
     if (!res) throw new FixError("The extension's background worker didn't answer. Reload the page and try again.");
     const host = new URL(url).hostname;
-    if (!res.ok) throw new FixError(`Couldn't reach ${host}: ${res.error}.`);
+    if (!res.ok) {
+      if (res.reason) console.info(`[Read Free] ${host}: ${res.error} (${res.reason})`);
+      if (res.reason === 'unreachable') throw new FixError(noAnswer([host]), { unreachable: true });
+      if (res.reason === 'cut-off') throw new FixError(`The connection to ${host} broke off before the page had arrived. Try again.`);
+      throw new FixError(`Couldn't reach ${host}: ${res.error}.`, { timedOut: !res.reason });
+    }
     const blocked = archive.looksBlocked(res.status, res.body);
     if (blocked === 'captcha') {
       throw new FixError(`${host} wants a CAPTCHA. Open it, complete the check, then click the toolbar button again.`, { blocked: true });
@@ -473,6 +487,37 @@
         if (missing) return noSnapshot(status, articleUrl, missing.checkedAt, mirror, paywalled);
       }
 
+      // Ask archive.today. addressOf: the page's address, given a mirror. If the mirror in use
+      // can't be connected to at all, a second one is asked, once, and the rest goes there too.
+      // Seen 2026-11-25: for minutes at a time, connections to archive.ph closed after 20 s
+      // without an answer. Not for a slow answer (every address has the same server behind it) or
+      // a CAPTCHA (that's for the reader to complete, not to go around).
+      const unanswered = [];
+      const startedAt = Date.now();
+      const ask = async (stage, addressOf, timeoutMs) => {
+        try {
+          return await bgFetch(addressOf(mirror), timeoutMs);
+        } catch (e) {
+          // With neither address answering, a list that times out is one more not answering.
+          if (e.timedOut && unanswered.length > 1) throw new FixError(noAnswer(unanswered), { unreachable: true });
+          if (!e.unreachable || stale()) throw e;
+          const first = mirror;
+          if (!unanswered.includes(first)) unanswered.push(first);
+          if (unanswered.length > 1) throw new FixError(noAnswer(unanswered), { unreachable: true });
+          mirror = archive.secondMirror(first);
+          console.info(`[Read Free] trying ${mirror} instead`);
+          status.stage(stage, `${first} didn't answer. Trying ${mirror}…`, stage === 'find' ? FIND_STAGE : DOWNLOAD_STAGE);
+          try {
+            return await bgFetch(addressOf(mirror), timeoutMs);
+          } catch (again) {
+            if (!again.unreachable) throw again;
+            unanswered.push(mirror);
+            mirror = first; // the reader's own choice, for what's left and for the banner's link
+            throw new FixError(noAnswer(unanswered), { unreachable: true });
+          }
+        }
+      };
+
       // Pull the article out of a snapshot page: { snapshot, complete }, or null if its text
       // isn't there.
       const read = async (body, snapshotUrl, snapshotTime) => {
@@ -491,7 +536,7 @@
       status.stage('download', 'Getting the newest archive.today snapshot…', DOWNLOAD_STAGE);
       explainWhileWaiting(status, articleUrl);
       try {
-        const res = await bgFetch(archive.newestUrl(articleUrl, mirror), SNAPSHOT_TIMEOUT_MS);
+        const res = await ask('download', m => archive.newestUrl(articleUrl, m), SNAPSHOT_TIMEOUT_MS);
         if (stale()) return;
         const memento = archive.mementoAt(res.url);
         if (!memento && res.status === 404) {
@@ -507,6 +552,7 @@
       } catch (e) {
         if (stale()) return;
         if (!(e instanceof FixError) || e.blocked) throw e;
+        if (e.unreachable && Date.now() - startedAt > GIVE_UP_AFTER_MS) throw e;
         // The lookup or the snapshot didn't come through: the timemap is a second way in.
         console.info(`[Read Free] the newest snapshot didn't come through (${e.message}); asking for the list of snapshots instead`);
       }
@@ -515,10 +561,10 @@
       // all of them when it didn't come through.
       status.stage('find', tried.length
         ? 'That snapshot was incomplete. Looking for older ones…'
-        : 'Asking archive.today for its list of snapshots…', { expectedMs: 1500, slowAfterMs: 8000, slowLabel: 'archive.today is slow to answer. Still waiting…' });
+        : 'Asking archive.today for its list of snapshots…', FIND_STAGE);
       let mementos = [];
       try {
-        const tm = await bgFetch(archive.timemapUrl(articleUrl, mirror), TIMEMAP_TIMEOUT_MS);
+        const tm = await ask('find', m => archive.timemapUrl(articleUrl, m), TIMEMAP_TIMEOUT_MS);
         if (stale()) return;
         mementos = tm.status === 200 ? archive.parseTimemap(tm.body) : [];
         if (!mementos.length && !tried.length) {
@@ -537,7 +583,6 @@
         .filter(m => !tried.includes(m.time))
         .slice(0, Math.max(0, MAX_ATTEMPTS - tried.length));
       for (const memento of candidates) {
-        const snapshotUrl = archive.toMirror(memento.url, mirror);
         const savedAgo = render.relativeTime(memento.time);
         status.stage('download', tried.length === 0
           ? `Waiting for archive.today to send the snapshot (saved ${savedAgo})…`
@@ -545,14 +590,14 @@
         tried.push(memento.time);
         let snap;
         try {
-          snap = await bgFetch(snapshotUrl, SNAPSHOT_TIMEOUT_MS);
+          snap = await ask('download', m => archive.toMirror(memento.url, m), SNAPSHOT_TIMEOUT_MS);
         } catch (e) {
           if (stale() || !best) throw e;
           break; // keep what we have
         }
         if (stale()) return;
         if (snap.status !== 200) continue;
-        const result = await read(snap.body, snapshotUrl, memento.time);
+        const result = await read(snap.body, archive.toMirror(memento.url, mirror), memento.time);
         if (stale()) return;
         if (result?.complete) return finishWith(status, articleUrl, result.snapshot, live);
         if (result && (!best || result.snapshot.chars > best.chars)) best = result.snapshot;

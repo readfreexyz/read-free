@@ -13,8 +13,9 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 // local: chrome.storage.local (the release record, src/release.js). version: the running one.
 // fetch: answers for Read Free's site (latest.txt). firefox: run as Firefox does, a background
 // page with no importScripts, given the same files first (tools/firefox.mjs), and a manifest with
-// Mozilla's settings. permissions: chrome.permissions, for Firefox (src/access.js).
-function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); }, firefox = false, permissions = null } = {}) {
+// Mozilla's settings. permissions: chrome.permissions, for Firefox (src/access.js). speed: its
+// timers run this much faster.
+function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); }, speed = 1, firefox = false, permissions = null } = {}) {
   const calls = [];
   const listeners = { message: [], changed: [], alarm: [], installed: [] };
   const alarms = {};
@@ -37,7 +38,7 @@ function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0',
     tabs: { sendMessage: async () => ({}), create: record('tab') },
     ...(permissions ? { permissions } : {}),
   };
-  const context = vm.createContext({ chrome, console, setTimeout, clearTimeout, setInterval, clearInterval, URL, AbortController, fetch });
+  const context = vm.createContext({ chrome, console, setTimeout: (fn, ms) => setTimeout(fn, ms / speed), clearTimeout, setInterval, clearInterval, URL, AbortController, fetch });
   context.self = context;
   const run = f => vm.runInContext(fs.readFileSync(path.join(EXT, f), 'utf8'), context);
   const source = fs.readFileSync(path.join(EXT, 'background.js'), 'utf8');
@@ -288,4 +289,61 @@ test('the welcome page: once, when Read Free is first loaded; never on an update
   w.installed('install');
   await settle();
   assert.equal(tabs().length, 1, 'never twice');
+});
+
+// What a content script hears when archive.today can't be fetched: no answer at all (another address
+// may do), an answer that broke off, or a timeout.
+test('a failed fetch says why: unreachable, cut off, or only slow', async () => {
+  const ask = fetch => new Promise(resolve => {
+    worker({ fetch }).send({ type: 'nytfix:fetch', url: 'https://archive.ph/newest/x', timeoutMs: 30 }, { id: 'nytfix', tab: { id: 1 } }, r => resolve(JSON.parse(JSON.stringify(r))));
+  });
+  const aborted = signal => new Promise((_, no) => signal.addEventListener('abort', () => no(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
+  assert.deepEqual(await ask(async () => { throw new TypeError('Failed to fetch'); }), { ok: false, error: 'Failed to fetch', reason: 'unreachable' });
+  assert.deepEqual(await ask(async () => ({ status: 200, url: 'x', text: async () => { throw new TypeError('network error'); } })), { ok: false, error: 'network error', reason: 'cut-off' });
+  assert.deepEqual(await ask((url, { signal }) => aborted(signal)), { ok: false, error: 'timed out after 0 s' });
+  assert.deepEqual(await ask(async (url, { signal }) => ({ status: 200, url: 'x', text: () => aborted(signal) })), { ok: false, error: 'timed out after 0 s' }, 'slow partway is a timeout too');
+  assert.deepEqual(await ask(async () => ({ status: 200, url: 'https://archive.ph/x', text: async () => 'hi' })), { ok: true, status: 200, url: 'https://archive.ph/x', body: 'hi' });
+});
+
+// Firefox retries dropped connections by itself, so a fetch can hang until its time is up: there,
+// after 25 s, the address is asked for its icon.
+test('no answer for long: an address whose icon comes is only slow; one that says nothing is unreachable', async () => {
+  const PAGE = 'https://archive.ph/newest/x';
+  const hang = signal => new Promise((_, no) => signal.addEventListener('abort', () => no(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
+  const run = async (page, icon, timeoutMs = 90000, firefox = true) => {
+    const asked = [];
+    const fetch = (url, init) => { asked.push(url); return url === PAGE ? page(init) : icon(init); };
+    const reply = await new Promise(resolve => {
+      worker({ fetch, speed: 200, firefox, permissions: { contains: async () => true } }).send({ type: 'nytfix:fetch', url: PAGE, timeoutMs }, { id: 'nytfix', tab: { id: 1 } }, r => resolve(JSON.parse(JSON.stringify(r))));
+    });
+    await new Promise(resolve => setTimeout(resolve, 60)); // anything asked late would show
+    return { reply, icons: asked.filter(u => u === 'https://archive.ph/favicon.ico').length, others: asked.filter(u => u !== PAGE && u !== 'https://archive.ph/favicon.ico') };
+  };
+  const answer = { status: 200, url: PAGE, text: async () => 'hi' };
+  const late = ms => ({ signal }) => Promise.race([hang(signal), new Promise(r => setTimeout(() => r(answer), ms / 200))]);
+  const never = ({ signal }) => hang(signal);
+  const icon404 = async () => ({ status: 404 });
+
+  const silent = await run(never, never);
+  assert.deepEqual(silent.reply, { ok: false, error: 'no answer in 35 s', reason: 'unreachable' });
+  assert.equal(silent.icons, 1, 'asked once');
+  assert.deepEqual(silent.others, []);
+  assert.deepEqual((await run(never, async () => { throw new TypeError('Failed to fetch'); })).reply.reason, 'unreachable');
+
+  const slow = await run(never, icon404);
+  assert.deepEqual(slow.reply, { ok: false, error: 'timed out after 90 s' }, 'any answer for the icon: only slow');
+  assert.equal((await run(late(70000), icon404)).reply.ok, true, 'a slow render is waited for');
+  assert.equal((await run(late(30000), never)).reply.ok, true, 'it came while the icon was being asked for');
+
+  const quick = await run(late(2000), never);
+  assert.equal(quick.reply.ok, true);
+  assert.equal(quick.icons, 0, 'nothing more is asked of an address that answers');
+  const body = { status: 200, url: PAGE, text: () => new Promise(r => setTimeout(() => r('hi'), 60000 / 200)) };
+  const big = await run(async () => body, never);
+  assert.equal(big.reply.ok, true, 'a long download is left alone');
+  assert.equal(big.icons, 0);
+  assert.equal((await run(never, never, 20000)).icons, 0, 'a request with a short limit has no time for it');
+  const chrome = await run(never, never, 90000, false);
+  assert.deepEqual(chrome.reply, { ok: false, error: 'timed out after 90 s' }, 'Chrome: not asked, since fetch() says so itself');
+  assert.equal(chrome.icons, 0);
 });

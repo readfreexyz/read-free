@@ -237,8 +237,9 @@ otherwise stops extension storage at 10 MB).
 - **Notifications:** **Confirm every time a wall comes off**, and **Start notifications over**
   (see [Notifications](#notifications)).
 - **archive.today address:** archive.today answers under several names (archive.ph, archive.is,
-  archive.today, archive.md, …). If the one in use stops loading, pick another. Some networks and
-  DNS services, Cloudflare's 1.1.1.1 among them, are known to block it.
+  archive.today, archive.md, …). If the one in use can't be connected to, one other is tried
+  (archive.is for archive.ph) before giving up; if it stays that way, pick another. Some networks
+  and DNS services, Cloudflare's 1.1.1.1 among them, are known to block it.
 - **Clear saved articles:** forgets the articles kept for instant reloads.
 - **Support the project**, at the bottom: the donation page (see [Donating](#donating)), and
   **I've donated. Don't ask again.**, which stops the status bar offering it.

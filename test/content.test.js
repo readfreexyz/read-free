@@ -479,6 +479,165 @@ test("the background worker doesn't answer twice: the reader is told, as before"
   }
 });
 
+// archive.ph's connections closed without an answer, for minutes at a time (2026-11-25): one other
+// address is asked.
+const DROPPED = { ok: false, error: 'Failed to fetch', reason: 'unreachable' };
+const onIs = url => url.replace('https://archive.ph/', 'https://archive.is/');
+
+test("archive.ph can't be connected to: archive.is is asked once, and the links go there", async () => {
+  const page = boot({
+    responses: {
+      [newestUrl(ARTICLE)]: DROPPED,
+      [newestUrl(ARTICLE, 'archive.is')]: { ...ok(COMPLETE), url: onIs(snapshotUrl(T[3])) },
+    },
+  });
+  try {
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is')]);
+    assert.equal(page.banner().querySelector('a').href, onIs(snapshotUrl(T[3])));
+    assert.ok(page.logs.some(l => l.includes('trying archive.is instead')));
+  } finally {
+    page.close();
+  }
+});
+
+test('the other address is kept for the rest: an incomplete snapshot there, then its list and older ones', async () => {
+  const page = boot({
+    responses: {
+      [newestUrl(ARTICLE)]: DROPPED,
+      [newestUrl(ARTICLE, 'archive.is')]: { ...ok(BEHIND_PAYWALL), url: onIs(snapshotUrl(T[3])) },
+      [onIs(timemapUrl(ARTICLE))]: ok(timemapFor(ARTICLE, [T[2], T[3]])),
+      [onIs(snapshotUrl(T[2]))]: ok(COMPLETE),
+    },
+  });
+  try {
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is'), onIs(timemapUrl(ARTICLE)), onIs(snapshotUrl(T[2]))]);
+    assert.equal(page.banner().querySelector('a').href, onIs(snapshotUrl(T[2])));
+  } finally {
+    page.close();
+  }
+});
+
+test("the connection drops on the list or on a snapshot: the other address is asked for that", async () => {
+  const timedOut = { ok: false, error: 'timed out after 90 s' };
+  for (const [dropped, then] of [
+    [timemapUrl(ARTICLE), [onIs(timemapUrl(ARTICLE)), onIs(snapshotUrl(T[3]))]],
+    [snapshotUrl(T[3]), [onIs(snapshotUrl(T[3]))]],
+  ]) {
+    const page = boot({
+      responses: {
+        [newestUrl(ARTICLE)]: timedOut,
+        [timemapUrl(ARTICLE)]: ok(timemapFor(ARTICLE, [T[3]])),
+        [onIs(timemapUrl(ARTICLE))]: ok(timemapFor(ARTICLE, [T[3]])),
+        [onIs(snapshotUrl(T[3]))]: ok(COMPLETE),
+        [dropped]: DROPPED,
+      },
+    });
+    try {
+      await waitFor(page.body);
+      assert.deepEqual(page.fetched, [newestUrl(ARTICLE), timemapUrl(ARTICLE), ...(dropped === timemapUrl(ARTICLE) ? [] : [dropped]), ...then], dropped);
+    } finally {
+      page.close();
+    }
+  }
+});
+
+test("neither address can be connected to: the reader's own is still asked for the list, and may answer", async () => {
+  const page = boot({
+    responses: {
+      [newestUrl(ARTICLE)]: DROPPED,
+      [newestUrl(ARTICLE, 'archive.is')]: DROPPED,
+      [timemapUrl(ARTICLE)]: ok(timemapFor(ARTICLE, [T[3]])),
+      [snapshotUrl(T[3])]: ok(COMPLETE),
+    },
+  });
+  try {
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is'), timemapUrl(ARTICLE), snapshotUrl(T[3])]);
+  } finally {
+    page.close();
+  }
+});
+
+test('nothing answers: the banner says so in plain words, links to the chosen address, and each is asked no more than it has to be', async () => {
+  const page = boot({
+    responses: { [newestUrl(ARTICLE)]: DROPPED, [newestUrl(ARTICLE, 'archive.is')]: DROPPED, [timemapUrl(ARTICLE)]: DROPPED },
+  });
+  try {
+    await waitFor(() => page.banner()?.dataset.kind === 'error');
+    assert.match(page.banner().textContent, /Couldn't connect to archive\.today: neither archive\.ph nor archive\.is answered\./);
+    assert.match(page.banner().textContent, /Wait a minute and try again\./);
+    assert.doesNotMatch(page.banner().textContent, /Failed to fetch/);
+    assert.equal(page.banner().querySelector('a').href, archive.searchUrl(ARTICLE, 'archive.ph'));
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is'), timemapUrl(ARTICLE)]);
+    assert.equal(page.storage.data[`missing:${ARTICLE}`], undefined, 'not remembered as missing');
+    assert.ok(page.logs.some(l => l.includes('archive.ph: Failed to fetch (unreachable)')), "the browser's own words are in the console");
+  } finally {
+    page.close();
+  }
+});
+
+test('neither answers and the list times out too: the banner still says neither answered', async () => {
+  const page = boot({
+    responses: { [newestUrl(ARTICLE)]: DROPPED, [newestUrl(ARTICLE, 'archive.is')]: DROPPED, [timemapUrl(ARTICLE)]: { ok: false, error: 'timed out after 20 s' } },
+  });
+  try {
+    await waitFor(() => page.banner()?.dataset.kind === 'error');
+    assert.match(page.banner().textContent, /neither archive\.ph nor archive\.is answered/);
+    assert.doesNotMatch(page.banner().textContent, /timed out/);
+  } finally {
+    page.close();
+  }
+});
+
+test("neither answers and it took long: the reader isn't kept waiting for a third request", async () => {
+  let page;
+  const late = () => { page.window.Date.now = () => Date.now() + 41000; return DROPPED; }; // 41 s have gone by
+  page = boot({ responses: { [newestUrl(ARTICLE)]: DROPPED, [newestUrl(ARTICLE, 'archive.is')]: late } });
+  try {
+    await waitFor(() => page.banner()?.dataset.kind === 'error');
+    assert.match(page.banner().textContent, /neither archive\.ph nor archive\.is answered/);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is')]);
+  } finally {
+    page.close();
+  }
+});
+
+test('the other address wants a CAPTCHA: it says which, links there, and asks no further', async () => {
+  const page = boot({
+    responses: {
+      [newestUrl(ARTICLE)]: DROPPED,
+      [newestUrl(ARTICLE, 'archive.is')]: { ok: true, status: 200, url: newestUrl(ARTICLE, 'archive.is'), body: '<div class="g-recaptcha"></div>' },
+    },
+  });
+  try {
+    await waitFor(() => page.banner()?.dataset.kind === 'error');
+    assert.match(page.banner().textContent, /archive\.is wants a CAPTCHA/);
+    assert.equal(page.banner().querySelector('a').href, archive.searchUrl(ARTICLE, 'archive.is'));
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is')]);
+  } finally {
+    page.close();
+  }
+});
+
+test("the answer breaks off partway: the list is asked for at the same address, as for a timeout", async () => {
+  const page = boot({
+    responses: {
+      [newestUrl(ARTICLE)]: { ok: false, error: 'network error', reason: 'cut-off' },
+      [timemapUrl(ARTICLE)]: ok(timemapFor(ARTICLE, [T[3]])),
+      [snapshotUrl(T[3])]: { ok: false, error: 'network error', reason: 'cut-off' },
+    },
+  });
+  try {
+    await waitFor(() => page.banner()?.dataset.kind === 'error');
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), timemapUrl(ARTICLE), snapshotUrl(T[3])]);
+    assert.match(page.banner().textContent, /The connection to archive\.ph broke off before the page had arrived\./);
+  } finally {
+    page.close();
+  }
+});
+
 test('a CAPTCHA on /newest/ is reported at once; asking another way would hit it too', async () => {
   const page = boot({
     responses: { [newestUrl(ARTICLE)]: { ok: true, status: 200, url: newestUrl(ARTICLE), body: '<div class="g-recaptcha"></div>' } },

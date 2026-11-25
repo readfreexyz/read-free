@@ -160,6 +160,28 @@ function markTab(tabId, state, title) {
   chrome.action.setTitle({ tabId, title: `${NAME}: ${title || 'removed the wall on this page.'}` }).catch(ignore);
 }
 
+// A failure's reason: 'unreachable' (no answer at all: the connection was dropped, refused or
+// blocked) or 'cut-off' (the answer broke off partway). None for a timeout: it's just slow. fetch()
+// says no more than "Failed to fetch" for any of them.
+// Firefox retries a dropped connection about ten times before fetch() fails (Chrome once, so it
+// says so in time), and drops that take 10 s each would look like a slow answer until the time is
+// up. So in Firefox, after PROBE_AFTER_MS without one, the address is asked for its icon: if that
+// doesn't come either, it's unreachable; if it does, the page is only slow (a snapshot being
+// rendered: 8-15 s, 73 s seen).
+const PROBE_AFTER_MS = 25000;
+const PROBE_TIMEOUT_MS = 10000;
+async function answersAtAll(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
+  try {
+    await fetch(new URL('/favicon.ico', url).href, { credentials: 'omit', cache: 'no-store', signal: ctrl.signal });
+    return true; // whatever it says
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function fetchArchive(url, timeoutMs = 20000) {
   if (!archive.isArchiveUrl(url)) return { ok: false, error: `not an archive.today URL: ${url}` };
   const ctrl = new AbortController();
@@ -167,15 +189,28 @@ async function fetchArchive(url, timeoutMs = 20000) {
   // Chrome stops an idle service worker after ~30 s. Calling an extension API resets
   // that timer, so keep pinging while a slow snapshot download is in flight.
   const keepAlive = setInterval(() => chrome.runtime.getPlatformInfo().catch(ignore), 20000);
+  let answered = false;
+  let done = false;
+  let silent = false;
+  const probe = selfUpdating && timeoutMs > PROBE_AFTER_MS + PROBE_TIMEOUT_MS && setTimeout(async () => {
+    if (answered || await answersAtAll(url) || answered || done) return;
+    silent = true;
+    ctrl.abort();
+  }, PROBE_AFTER_MS);
   try {
     // credentials: send archive.today cookies, e.g. from a CAPTCHA solved in a tab.
     const res = await fetch(url, { credentials: 'include', signal: ctrl.signal });
+    answered = true;
     const body = await res.text();
     return { ok: true, status: res.status, url: res.url, body };
   } catch (e) {
-    return { ok: false, error: e.name === 'AbortError' ? `timed out after ${Math.round(timeoutMs / 1000)} s` : e.message };
+    if (silent) return { ok: false, error: `no answer in ${Math.round((PROBE_AFTER_MS + PROBE_TIMEOUT_MS) / 1000)} s`, reason: 'unreachable' };
+    if (e.name === 'AbortError') return { ok: false, error: `timed out after ${Math.round(timeoutMs / 1000)} s` };
+    return { ok: false, error: e.message, reason: answered ? 'cut-off' : 'unreachable' };
   } finally {
+    done = true;
     clearTimeout(timer);
+    clearTimeout(probe);
     clearInterval(keepAlive);
   }
 }
