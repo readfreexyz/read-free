@@ -21,7 +21,7 @@
   if (globalThis.__nytfixLoaded) return;
   globalThis.__nytfixLoaded = true;
 
-  const { archive, extract, render, status: statusBar, paywall, notices, cache: articleCache, scroll: scrollTracker, settings: settingsLib, notify: notifyLib, tally: tallyLib, reasons: reasonsLib, adapter: adapterLib, sites = {} } = globalThis.NYTFix;
+  const { archive, extract, render, status: statusBar, paywall, notices, cache: articleCache, scroll: scrollTracker, settings: settingsLib, notify: notifyLib, tally: tallyLib, reasons: reasonsLib, adapter: adapterLib, details: detailsLib, sites = {} } = globalThis.NYTFix;
   const KEPT_ATTR = adapterLib?.KEPT_ATTR || 'data-nytfix-kept';
   // hosts may hold '*.example.com' for every subdomain (Corriere's local editions).
   const onHost = host => host === location.hostname || (host.startsWith('*.') && location.hostname.endsWith(host.slice(1)));
@@ -45,6 +45,8 @@
   // After a swap, how long to check that the site hasn't redrawn the article over it.
   const SWAP_GUARD_MS = 30000;
   const SWAP_GUARD_TRIES = 5;
+  // After a wall is lifted, how long until the page must be scrollable (wall.failOpen)
+  const FROZEN_CHECK_MS = 2500;
 
   const cache = articleCache.create(chrome.storage.local);
   // The reader's settings (settings.js), loaded before the page is acted on and kept current.
@@ -67,6 +69,9 @@
   let pagePaywalled = false;
   let generation = 0;       // bumped on navigation, so work for the previous page stops
   let stopWatching = () => {};
+  let stopMissed = () => {};  // a wall that isn't recognized (paywall.watchMissed)
+  let missed = null;          // ...and what was seen: 'hidden' (the site's popup), 'cut' (the text), or
+                              // 'frozen' / 'stuck' (lifted, but it can't be scrolled; stuck: archived text is in)
   let stopNotices = () => {}; // ad-blocker notices (notices.js)
   let stopKeeping = () => {}; // putting back what a wall deletes (site.live.keep)
   let siteCut = false;        // ...and it did, on this page
@@ -130,7 +135,12 @@
   const pageState = () => (!siteOn() ? 'off' : !supportedPage() ? 'not-article' : stateName());
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type === 'nytfix:state') {
-      sendResponse({ site: site.id, state: pageState(), mark: iconMark?.state || null, restored: userRestored });
+      sendResponse({ site: site.id, state: pageState(), mark: iconMark?.state || null, restored: userRestored, ...(missed ? { missed, article: site.isArticle(location.pathname) } : {}) });
+      return false;
+    }
+    // Copy page details (the menu): the page's structure, whatever kind of page it is
+    if (msg?.type === 'nytfix:details') {
+      sendResponse({ details: detailsLib ? detailsLib.describe(document, site, { version: chrome.runtime.getManifest?.().version || '', browser: settingsLib.browserName(navigator.userAgent), state: pageState(), missed }) : null });
       return false;
     }
     if (msg?.type !== 'nytfix:toggle') return false;
@@ -156,6 +166,7 @@
     pagePaywalled = false;
     noticesHidden = false;
     explainedHere = false;
+    missed = null;
     tracker.reset();
     document.documentElement.classList.remove('nytfix-off');
     // "Turn off your ad blocker" popups: hidden on every page of the site (Corriere's homepage
@@ -194,7 +205,38 @@
       });
     }
     stopWatching = paywall.watch(document, site, () => {
-      if (!loading && !applied() && !userRestored) activate();
+      if (!loading && !applied() && !userRestored && missed !== 'hidden') activate();
+    });
+    const free = () => siteOn() && !loading && !applied() && !userRestored && !missed;
+    stopMissed = paywall.watchMissed(document, site, {
+      // Site CSS is hiding something the site would be showing, and nothing here will undo what
+      // comes with it: the site's version, rather than a page that's held for no visible reason.
+      onHidden: () => { if (free()) showMissed('hidden'); },
+      onCut: () => { if (free() && site.isArticle(location.pathname)) showMissed('cut'); },
+    });
+  }
+
+  // A wall that isn't recognized: say so, and offer what can be done by hand. The status bar is
+  // outside the page's content, so it can be used even where the site has made that inert.
+  function showMissed(what) {
+    missed = what;
+    const name = site.shortName || site.name;
+    const article = site.isArticle(location.pathname);
+    const message = {
+      cut: 'This page looks cut off, but Read Free didn\'t recognize a wall.',
+      hidden: `${name} put up something Read Free doesn't recognize, so it's been left in place.`,
+      frozen: `Read Free couldn't free the scrolling here, so ${name}'s wall is back.`,
+      stuck: "The article is in, but Read Free couldn't free the scrolling here.",
+    }[what];
+    console.info(`[Read Free] missed: ${what}`);
+    if (what === 'hidden' || what === 'frozen') render.showWall(document);
+    statusBar.create(document).finish('info', message, {
+      hideAfterMs: 30000,
+      offer: {
+        button: what === 'frozen' || what === 'stuck' ? null : article ? 'Load from archive.today' : 'Remove it',
+        onAccept: () => { if (!loading && !applied()) activate({ manual: true }); },
+        report: reportLink(message),
+      },
     });
   }
 
@@ -206,6 +248,7 @@
     generation++;
     loading = false;
     stopWatching();
+    stopMissed();
     stopNotices();
     stopKeeping();
     undoAll({ putBackPaywall: false });
@@ -228,6 +271,18 @@
   function activate({ manual = false } = {}) {
     if (!siteOn()) return; // turned off in another tab since this page started
     if (manual) pageGuard('hold');
+    // The reader says it's a wall: the text is held to what a cut page shows (run), and a page with
+    // nothing to swap in is let go of.
+    const byHand = manual && missed;
+    if (byHand) {
+      missed = null;
+      if (site.isArticle(location.pathname)) pagePaywalled = true;
+      else {
+        lift();
+        markIcon('lifted', `Removed ${site.shortName || site.name}'s wall.`);
+        return;
+      }
+    }
     const wall = paywall.wallType(document, site);
     if (wall) {
       const wording = paywall.popupWording(document, site).slice(0, 160);
@@ -300,6 +355,22 @@
     const place = placeToKeep();
     undoLift = render.liftWall(document, site);
     keepPlace(place);
+    if (site.live.wall?.failOpen) setTimeout(checkFrozen, FROZEN_CHECK_MS, generation);
+  }
+
+  // The wall is off, but the page still can't be scrolled: give the site's wall back rather than
+  // leave the reader on a page that's held. Once archived text is in, that's worth keeping, so it's
+  // only said. While archive.today loads, not yet: run() checks when it's done.
+  function checkFrozen(gen) {
+    if (gen !== generation || !undoLift || loading || userRestored || !render.frozen(document, site)) return;
+    if (undoSwap) {
+      showMissed('stuck');
+      return;
+    }
+    undoAll();
+    render.removeBanner(document);
+    markIcon(null);
+    showMissed('frozen');
   }
 
   function clearPlaceholder() {
@@ -652,7 +723,10 @@
         actions: [tryAgain, dismiss],
       });
     } finally {
-      if (!stale()) loading = false;
+      if (!stale()) {
+        loading = false;
+        if (site.live.wall?.failOpen) setTimeout(checkFrozen, FROZEN_CHECK_MS, gen);
+      }
     }
   }
 

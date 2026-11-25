@@ -220,6 +220,17 @@ otherwise stops extension storage at 10 MB).
   to hello@readfree.xyz in your mail app, filled in with what happened, the outlet and the
   versions; never the article's address (paste it if you want that page looked at). Nothing is
   sent unless you send it.
+- **A wall it doesn't recognize** (NYT for now; sites change their walls without warning):
+  - If NYT would be showing its popup, it's a wall, whatever else NYT did to the page: Read Free
+    lets the popup out for an instant, before anything is drawn, and measures it.
+  - If that popup is something new, NYT's version goes back up after a few seconds, with a note. A
+    page that still can't be scrolled 2.5 s after its wall came off (or after archive.today is done)
+    gets its wall back too; if the archived article is already in, it stays, and a note says so.
+  - If an article is cut and no wall shows, a note offers to load it from archive.today. Nothing is
+    fetched until you ask. The toolbar menu offers the same.
+- **Copy page details**, in the toolbar menu: how the page is built, to paste in that email. Names,
+  counts and sizes of its parts, and which fixed phrases a wall uses ("subscribe", "log in"). No
+  article text, no address, nothing that names you, and nothing is sent.
 - **Photos:** snapshots keep only the one size the page loaded when it was captured. Where the
   site's image server can be asked for a bigger one (NYT's `-superJumbo` crops, FT's `width`
   parameter, The New Yorker's `w_2560`), 2x screens get that instead, falling back to the
@@ -346,6 +357,7 @@ daily check on GitHub (`.github/workflows/site-health.yml`), and readers' report
 | `extension/page/*.js` | Page-world guards: scripts that run in a site's own JavaScript world (`"world": "MAIN"`, at `document_start`, before its scripts) and keep the site's code from cutting an article it already sent. They mark `<html data-nytfix-held>` with what they held back, and answer `nytfix:release` (the reader asked for the site's version) and `nytfix:hold` events from the content script. |
 | `extension/src/adapter.js` | Shared pieces for adapters: `defineSite` (defaults and registration), the page's JSON-LD (paywall flag, article length), wall checks built on it (`cutBody`, `textOnPage`, `anyShown`), and what common paywall services (Piano, Zephr) put on the page. |
 | `extension/background.js` | Draws the toolbar icon: grey while the extension is off everywhere or on that tab's site, and a ✓ mark while a page's wall is off (the content script says when). Fetches pages for the content script, which can't make cross-site requests itself. Only `https` archive.today URLs are allowed. |
+| `extension/src/details.js` | Copy page details: the page's structure as text, for a report, without its words or address. |
 | `extension/src/archive.js` | archive.today addresses: the newest snapshot (`/newest/`, which redirects to it), the snapshot list (`/timemap/`), mirrors, and spotting CAPTCHA pages. |
 | `extension/src/extract.js` | Finds the article body in the snapshot (where the adapter says, or `auto`: the marked block holding the most paragraphs) and pulls out paragraphs (with their links, unwrapped to the original address, and emphasis), subheadings, and photos with captions, plus a sharper copy of each photo where the adapter knows one. Skips cards for other stories. |
 | `extension/src/render.js` | Lifts the wall (removes `inert`, hides the scrim and the adapter's or paywall service's elements, shows text the site hid, unlocks scrolling), and separately swaps the text in using NYT's own paragraph classes and wrappers. Shows the banner, handles undo, and scrolls the reader back into place. |

@@ -91,6 +91,7 @@
   let page = null;
   let reloading = false;
   let poll = null;
+  let details = null; // for Copy page details
 
   const ask = async () => {
     try {
@@ -134,7 +135,30 @@
   async function refresh() {
     page = site ? await ask() : null;
     render();
+    if (!(details && page?.state === 'loading')) await fetchDetails(); // not at every look while it loads
   }
+
+  // Copy page details (src/details.js). Asked for beforehand: the clipboard only takes it straight
+  // from the click (Firefox), with no waiting in between.
+  async function fetchDetails() {
+    details = null;
+    if (page) {
+      try {
+        details = (await chrome.tabs.sendMessage(tab.id, { type: 'nytfix:details' }))?.details || null;
+      } catch { /* the page went away */ }
+    }
+    $('details-row').hidden = !details;
+  }
+  $('details').addEventListener('click', async () => {
+    if (!details) return;
+    const copied = navigator.clipboard ? await navigator.clipboard.writeText(details).then(() => true, () => false) : false;
+    $('details-note').textContent = copied ? 'Copied. Paste it in your email.' : 'Copy the text below.';
+    $('details-text').hidden = copied;
+    if (!copied) {
+      $('details-text').value = details;
+      $('details-text').select();
+    }
+  });
 
   // A switch changed. If it's about this tab's site, reload the tab, so the page is acted on (or
   // left as the site sends it) from the start; the menu stays open and shows the result.

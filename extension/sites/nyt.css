@@ -3,11 +3,19 @@
    shows, and the page container is never pinned (which is what threw readers back to the top).
    The core script handles what CSS can't: `inert`, and the gradient scrim if it has content.
    When the reader asks for NYT's version, the extension adds .nytfix-off to bring the wall back. */
-html:not(.nytfix-off) #gateway-content,
-html:not(.nytfix-off) [data-testid="onsite-messaging-unit-gateway"],
+/* .nytfix-probe: the popup let out for a moment, before anything is painted, to see whether NYT
+   would be showing it (paywall.js). Only the popup: the page stays unpinned, so it can't jump. */
+html:not(.nytfix-off, .nytfix-probe) #gateway-content,
+html:not(.nytfix-off, .nytfix-probe) [data-testid="onsite-messaging-unit-gateway"],
 html:not(.nytfix-off) #gateway-exit-advisory,
 html:not(.nytfix-off) [data-testid="vi-gateway-container"] > div:empty {
   display: none !important;
+}
+/* Measured as it ends up, not on the first frame of sliding or fading in */
+html.nytfix-probe #gateway-content,
+html.nytfix-probe [data-testid="onsite-messaging-unit-gateway"] {
+  animation: none !important;
+  transition: none !important;
 }
 html:not(.nytfix-off) [data-testid="vi-gateway-container"] {
   position: static !important;

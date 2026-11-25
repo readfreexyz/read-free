@@ -153,3 +153,118 @@ test('watch stops when told to, and after its time limit', async () => {
   assert.equal(stoppedCalls, 0);
   assert.equal(lateCalls, 0);
 });
+
+// The popup's size in a browser: NYT shows it only under a wall (data-shown here), and nyt.css hides
+// it unless <html> lets it out (nytfix-off, or nytfix-probe for a measurement).
+function layOut(doc, { shown = true } = {}) {
+  const html = doc.documentElement;
+  const seen = [];
+  doc.querySelector('#gateway-content').getBoundingClientRect = () => {
+    const out = html.classList.contains('nytfix-off') || html.classList.contains('nytfix-probe');
+    seen.push([...html.classList].join(' '));
+    return shown && out ? { width: 1165, height: 370 } : { width: 0, height: 0 };
+  };
+  return seen;
+}
+const unmarked = options => {
+  const doc = parse(livePageHtml({ marks: 'parts', ...options }));
+  for (const el of doc.querySelectorAll('[inert]')) { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); }
+  return doc;
+};
+
+test('a wall with marks Read Free does not know: its popup is measured, let out just for that', () => {
+  const doc = unmarked({ upsell: 'inside' });
+  layOut(doc);
+  assert.equal(paywall.wallInPage(doc, nyt), false, 'nothing inert');
+  assert.equal(paywall.isActive(doc, nyt), true);
+  assert.equal(doc.documentElement.className, '', 'hidden again at once');
+  assert.equal(paywall.wallType(doc, nyt), 'paywall');
+  const login = unmarked();
+  layOut(login);
+  assert.equal(paywall.wallType(login, nyt), 'login', 'the login wording, whole text');
+});
+
+test('a popup NYT is not showing is no wall, however full; nor is one with neither the wording nor a cut', () => {
+  const idle = unmarked({ upsell: 'inside' });
+  layOut(idle, { shown: false });
+  assert.equal(paywall.isActive(idle, nyt), false, 'filled, but 0x0 once let out');
+  const other = unmarked();
+  other.getElementById('gateway-content').innerHTML = '<p>Something new.</p>';
+  layOut(other);
+  assert.equal(paywall.isActive(other, nyt), false);
+  assert.equal(paywall.hiddenPopupShows(other, nyt), true, 'shown, though (watchMissed)');
+  const empty = unmarked({ upsell: 'inside' });
+  empty.getElementById('gateway-content').innerHTML = '';
+  const seen = layOut(empty);
+  assert.equal(paywall.isActive(empty, nyt), false);
+  assert.ok(!seen.some(c => c.includes('nytfix-probe')), 'an empty popup is never let out');
+});
+
+test('the popup is measured at most once a second, and not while the wall is off or shown', () => {
+  const doc = unmarked({ upsell: 'inside' });
+  const seen = layOut(doc);
+  for (let i = 0; i < 5; i++) paywall.hiddenPopupShows(doc, nyt);
+  assert.equal(seen.filter(c => c === 'nytfix-probe').length, 1);
+  for (const state of ['nytfix-active', 'nytfix-off']) {
+    const held = unmarked({ upsell: 'inside' });
+    held.documentElement.classList.add(state);
+    const looks = layOut(held);
+    assert.equal(paywall.hiddenPopupShows(held, nyt), false, state);
+    assert.ok(!looks.some(c => c.includes('nytfix-probe')), state);
+  }
+});
+
+const FAST = { pollMs: 10, hiddenAfterMs: 60, cutAfterMs: 120 };
+const missedOn = async (doc, site = nyt, { wait = 250, during = () => {} } = {}) => {
+  const calls = [];
+  const stop = paywall.watchMissed(doc, site, { ...FAST, onHidden: () => calls.push('hidden'), onCut: () => calls.push('cut') });
+  during();
+  await sleep(wait);
+  stop();
+  return calls;
+};
+
+test('watchMissed: an unknown popup the site would show, a cut article with no wall; each once, after a while', async () => {
+  const other = unmarked();
+  other.getElementById('gateway-content').innerHTML = '<p>Something new.</p>';
+  layOut(other);
+  assert.deepEqual(await missedOn(other), ['hidden']);
+  const cut = unmarked({ upsell: 'inside' });
+  cut.getElementById('gateway-content').innerHTML = '';
+  assert.deepEqual(await missedOn(cut), ['cut']);
+  assert.deepEqual(await missedOn(cut, nyt, { wait: 60 }), [], 'not at once: the wall may be on its way');
+});
+
+test('watchMissed: nothing for a known wall, a wall-free page, or a site without it', async () => {
+  const known = parse(livePageHtml({ marks: 'parts', upsell: 'inside' }));
+  layOut(known);
+  assert.deepEqual(await missedOn(known), []);
+  const free = parse(livePageHtml({ wall: null }));
+  layOut(free, { shown: false });
+  assert.deepEqual(await missedOn(free), []);
+  const prefilled = unmarked();
+  layOut(prefilled, { shown: false });
+  assert.deepEqual(await missedOn(prefilled), [], 'the popup is filled, but not shown');
+  const without = { ...nyt, live: { ...nyt.live, wall: { ...nyt.live.wall, failOpen: undefined } } };
+  const cut = unmarked({ upsell: 'inside' });
+  cut.getElementById('gateway-content').innerHTML = '';
+  assert.deepEqual(await missedOn(cut, without), [], 'only where the adapter asks for it');
+  const late = unmarked({ upsell: 'inside' });
+  late.getElementById('gateway-content').innerHTML = '';
+  assert.deepEqual(await missedOn(late, nyt, { during: () => setTimeout(() => raiseWall(late, 'paywall', { marks: 'parts' }), 40) }), [], 'recognized before the note');
+});
+
+test('a popup that takes up room but cannot be seen is not on screen', () => {
+  const rect = (doc, box, visible = true) => {
+    const popup = doc.querySelector('#gateway-content');
+    popup.getBoundingClientRect = () => (doc.documentElement.classList.contains('nytfix-probe') ? box : { width: 0, height: 0 });
+    popup.checkVisibility = () => visible;
+    return paywall.isActive(doc, nyt);
+  };
+  const seen = { width: 1000, height: 370, top: 300, left: 0 };
+  assert.equal(rect(unmarked(), seen), true);
+  assert.equal(rect(unmarked(), seen, false), false, 'opacity 0, or visibility hidden');
+  assert.equal(rect(unmarked(), { ...seen, top: 5000 }), false, 'below the window');
+  assert.equal(rect(unmarked(), { ...seen, left: -2000 }), false, 'off to the side');
+  assert.equal(rect(unmarked(), { ...seen, top: -400 }), false, 'above it');
+});

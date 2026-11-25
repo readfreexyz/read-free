@@ -71,6 +71,9 @@
   <!-- An email to Read Free that the reader writes and sends (settings.reportLink); the address
        as text too, for a browser with no mail app set up -->
   <p class="report"><a id="report">Report a problem</a> <span class="report-to" id="report-to"></span></p>
+  <!-- The page's structure, for that email (src/details.js): no article text, no address, nothing sent -->
+  <p class="report" id="details-row" hidden><button type="button" class="nf-link" id="details" title="Names, counts and sizes of the page's parts. No article text and no address. Nothing is sent.">Copy page details</button> <span class="report-to" id="details-note" role="status" aria-live="polite"></span></p>
+  <textarea class="details-text" id="details-text" readonly hidden aria-label="Page details"></textarea>
 
   <script src="../src/archive.js"></script>
   <script src="../src/settings.js"></script>

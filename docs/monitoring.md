@@ -67,3 +67,20 @@ address as text too, for a browser with no mail app set up.
 Fix the adapter, add a test from what the page now looks like, bump the version and release
 (`docs/auto-update.md`). Copies installed with the install script have it within the hour; copies
 loaded by hand see the ↑ the next day.
+
+## Walls it can't see
+
+The daily check reads pages without running them, and NYT, the FT, The Atlantic, WSJ and Reuters refuse it,
+so it never sees a wall go up. On 2026-11-25 NYT's wall had changed (`docs/phase0-findings.md`), and
+nothing said so. Readers' own pages are where that shows, and there's no telemetry, so:
+
+- **A hidden popup is measured** (`paywall.hiddenPopupShows`): site CSS hides NYT's popup, so it's let out
+  (`.nytfix-probe`) just for the measurement. On screen, with the wall's wording or a cut article, it's a
+  wall, whatever marks NYT uses (`wall.probe`).
+- **It fails open** (`wall.failOpen`, `paywall.watchMissed`, `render.frozen`): a popup that isn't
+  recognized, or a page still frozen after a lift, gets the site's wall back, with a note and an email link.
+- **A cut article with no wall** gets a note, and is fetched only on request (`wall.cut`).
+- **Copy page details** (`src/details.js`) gives a report what's needed to fix it, without developer tools.
+
+They're the adapter's to turn on; only NYT's does so far. Others need a popup that measures 0x0 without
+a wall, or a line that only a cut article has.

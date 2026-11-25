@@ -63,6 +63,13 @@
         // nyt.css hides the wall on every page; where Read Free doesn't act, nothing would undo the
         // rest (a pinned page with no wall to see), so the site's own wall shows there.
         elsewhere: 'show',
+        // If NYT changes its marks again (paywall.js): the popup is measured, let out for a moment.
+        // Shown with the wall's wording or a cut article, it's a wall like any other (probe); shown
+        // with neither, NYT's own wall goes back up after a few seconds, with a note (failOpen). An
+        // article that's cut with no wall to see gets a note too (cut).
+        probe: doc => cutOff(doc) || LOGIN_WORDING.test(doc.querySelector('#gateway-content')?.textContent || ''),
+        failOpen: true,
+        cut: doc => cutOff(doc),
         container: '[data-testid="vi-gateway-container"]', // its positioned children are scrims
         login: LOGIN_WORDING, // the login wall's popup wording
         // 'login' only when the popup says so and the text isn't cut. Since Nov 2026 the paywall's

@@ -84,6 +84,7 @@
     .ask-text { flex: 1 0 100%; margin: 0; color: var(--nf-bar-muted, #a3a3a3); }
     .fill { transform-origin: left center; }
     .give { flex: none; padding: 2px 10px; border: 1px solid var(--nf-bar-give-bg, #c2415b); border-radius: 999px; color: var(--nf-bar-text, #fff); font-weight: 600; text-decoration: none; white-space: nowrap; }
+    .accept { background: none; font: inherit; font-weight: 600; cursor: pointer; }
     .give:hover { background: var(--nf-bar-give-bg, #c2415b); color: var(--nf-bar-give-text, #fff); }
     .later { flex: none; color: var(--nf-bar-muted, #a3a3a3); text-decoration: underline; text-underline-offset: 2px; }
     @media (prefers-reduced-motion: reduce) { .bar, .fill { transition: none; } }
@@ -240,9 +241,11 @@
     //            if given, is called instead of following href
     //   newer    { text, button, href }: a newer version is out, with a link to how to update
     //            (https only)
-    // A bar with a reason, a donation link or a newer version closes with its × only, so its
-    // links can be used; any other finished bar closes on a click anywhere.
-    function finish(kind, text, { link = null, reason = null, explain = false, donate = null, newer = null, hideAfterMs = kind === 'error' ? 8000 : link ? 6000 : 3000 } = {}) {
+    //   offer    { button, onAccept, report: { text, href, title } }: something the reader can have
+    //            done here, and an email link (mailto: only)
+    // A bar with a reason, a donation link, a newer version or an offer closes with its × only, so
+    // its links can be used; any other finished bar closes on a click anywhere.
+    function finish(kind, text, { link = null, reason = null, explain = false, donate = null, newer = null, offer = null, hideAfterMs = kind === 'error' ? 8000 : link ? 6000 : 3000 } = {}) {
       finished = true;
       win.clearInterval(ticker);
       bar.classList.remove('pending');
@@ -251,7 +254,7 @@
       label.textContent = text;
       if (link && /^https:\/\//i.test(link.href)) time.replaceWith(outLink('link', link.short || link.text, link.href));
       const showNewer = Boolean(newer && /^https:\/\//i.test(newer.href));
-      const extras = Boolean(reason || donate || showNewer || whyBlock);
+      const extras = Boolean(reason || donate || showNewer || offer || whyBlock);
       if (reason && !whyBlock) {
         why(reason, { open: explain });
         if (!explain) {
@@ -286,6 +289,19 @@
         const words = el(doc, 'p', 'ask-text');
         words.textContent = newer.text;
         note.append(words, outLink('link', `${newer.button || 'How to update'} ↗`, newer.href));
+        track.before(note);
+      }
+      if (offer) {
+        const note = el(doc, 'div', 'ask offer');
+        if (offer.button) note.append(a11yButton('give accept', offer.button, () => { remove(); offer.onAccept(); }));
+        if (/^mailto:/i.test(offer.report?.href)) {
+          const mail = el(doc, 'a', 'later');
+          mail.href = offer.report.href;
+          mail.textContent = offer.report.text;
+          if (offer.report.title) mail.title = offer.report.title;
+          mail.addEventListener('click', event => event.stopPropagation());
+          note.append(mail);
+        }
         track.before(note);
       }
       if (extras) {

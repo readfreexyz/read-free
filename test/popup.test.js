@@ -68,3 +68,13 @@ test('off on this site, off everywhere, and reloading after a switch', () => {
   assert.equal(at(ON, null, true).tone, 'working');
   assert.match(at(ON, null, true).text, /Reloading/);
 });
+
+test("a wall that wasn't recognized: the menu says so and offers it by hand", () => {
+  const at = page => describe({ url: url('https://www.nytimes.com/2026/11/14/us/x.html'), site: nyt, page: { state: 'idle', ...page }, prefs: ON });
+  assert.match(at({ missed: 'cut', article: true }).text, /looks cut off/);
+  assert.deepEqual(at({ missed: 'cut', article: true }).action, { id: 'toggle', label: 'Load from archive.today', primary: true });
+  assert.match(at({ missed: 'hidden', article: true }).text, /doesn't recognize/);
+  assert.equal(at({ missed: 'hidden', article: false }).action.label, 'Remove it');
+  assert.match(at({ missed: 'frozen', article: false }).text, /couldn't free the scrolling/);
+  assert.equal(at({}).text, 'No wall on this page.');
+});

@@ -616,6 +616,25 @@
     };
   }
 
+  // The page can't be scrolled, though there's more of it than fits the window: something the
+  // wall did is still in place.
+  function frozen(doc, site) {
+    const win = doc.defaultView;
+    const main = doc.querySelector(site.live.main || 'main');
+    const scroller = doc.scrollingElement || doc.documentElement;
+    if (!main || main.scrollHeight <= win.innerHeight * 1.2) return false;
+    // Scrolled inside an element of its own (a full-window page), not by the window
+    for (let n = main; n && n !== doc.body && n !== doc.documentElement; n = n.parentElement) {
+      if (/auto|scroll/.test(win.getComputedStyle(n).overflowY) && n.scrollHeight > n.clientHeight + 2) return false;
+    }
+    if (scroller.scrollHeight <= win.innerHeight + 2) return true;
+    // <html>'s overflow is the window's; <body>'s is, if <html> has none of its own
+    const html = win.getComputedStyle(doc.documentElement).overflowY;
+    const body = doc.body ? win.getComputedStyle(doc.body).overflowY : 'visible';
+    const own = html && html !== 'visible' ? html : body;
+    return own === 'hidden' || own === 'clip';
+  }
+
   // Show the wall the way the site draws it (a paywalled page the extension can't fix, or
   // where archive.today couldn't help and there's no article on the page at all).
   function showWall(doc) {
@@ -763,7 +782,7 @@
 
   const render = { swapIntact, keepOnPage,
     liveArticleBody, liveStats, paragraphTemplate, relativeTime, describeTime, showBanner, removeBanner,
-    liftPaywall, anchorTop, scrollAnchorTo, readingAnchor, liftWall, showWall, hideWall, upsellLines, showLoadingPlaceholder, apply,
+    liftPaywall, frozen, anchorTop, scrollAnchorTo, readingAnchor, liftWall, showWall, hideWall, upsellLines, showLoadingPlaceholder, apply,
   };
   root.NYTFix = Object.assign(root.NYTFix || {}, { render });
   if (typeof module === 'object' && module.exports) module.exports = render;

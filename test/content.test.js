@@ -128,6 +128,7 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
     window, doc, fetched, marks, storage, logs,
     mark: () => marks[marks.length - 1] ?? null,
     toggle: () => new Promise(resolve => listeners[0]({ type: 'nytfix:toggle' }, {}, resolve)),
+    details: () => new Promise(resolve => listeners[0]({ type: 'nytfix:details' }, {}, resolve)),
     // Plain copies: objects made in the page have its own prototypes.
     state: () => new Promise(resolve => listeners[0]({ type: 'nytfix:state' }, {}, r => resolve(JSON.parse(JSON.stringify(r))))),
     // The content script reads the settings before it acts on the page: one turn of the event loop.
@@ -2067,6 +2068,231 @@ test('nrc: cut before the extension started, it goes to archive.today', async ()
   try {
     await waitFor(() => page.fetched.length > 0);
     assert.match(page.fetched[0], /archive\.(ph|today|is)/);
+  } finally {
+    page.close();
+  }
+});
+
+// A wall Read Free doesn't know (paywall.watchMissed; the waits are shortened here). LAYOUT stands in
+// for the browser's: NYT shows its popup only under a wall ([data-shown]), and nyt.css hides it.
+const LAYOUT = `Element.prototype.getBoundingClientRect = function () {
+  const html = document.documentElement.classList;
+  const out = this.id === 'gateway-content' && 'shown' in this.dataset && (html.contains('nytfix-off') || html.contains('nytfix-probe'));
+  return out ? { width: 1165, height: 370, top: 0, left: 0, bottom: 370, right: 1165 } : { width: 0, height: 0, top: 0, left: 0, bottom: 0, right: 0 };
+};`;
+const quick = url => [LAYOUT, ...scriptsFor(url).map(s => s
+  .replace('pollMs = 1000, hiddenAfterMs = 4000, cutAfterMs = 8000', 'pollMs = 10, hiddenAfterMs = 60, cutAfterMs = 100')
+  .replace('FROZEN_CHECK_MS = 2500', 'FROZEN_CHECK_MS = 60'))];
+// A walled page with none of the marks Read Free knows. popup: what it holds; shown: NYT shows it.
+function unknownWall({ upsell = null, popup = null, shown = true } = {}) {
+  let html = livePageHtml({ marks: 'parts', upsell }).replaceAll(' inert aria-hidden="true"', '');
+  if (popup !== null) html = html.replace(/(<div id="gateway-content"[^>]*>)[\s\S]*?<div><\/div><\/div>/, `$1${popup}</div>`);
+  return shown ? html.replace('<div id="gateway-content"', '<div id="gateway-content" data-shown') : html;
+}
+const offerButton = page => page.doc.getElementById('nytfix-status')?.shadowRoot.querySelector('.offer .accept');
+const good = { [timemapUrl(ARTICLE)]: ok(timemapFor(ARTICLE, [T[3]])), [snapshotUrl(T[3])]: ok(COMPLETE) };
+
+test('a wall with none of the known marks, but shown by NYT over a cut article: handled like any other', async () => {
+  const page = boot({ html: unknownWall({ upsell: 'inside' }), responses: good, scripts: quick(ARTICLE) });
+  try {
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+    assert.equal(page.mark(), 'swapped');
+    assert.equal(page.doc.documentElement.classList.contains('nytfix-probe'), false);
+  } finally {
+    page.close();
+  }
+});
+
+test("something unknown that NYT shows: after a wait NYT's version goes back up, with a note; nothing is fetched until the reader asks", async () => {
+  const page = boot({ html: unknownWall({ popup: '<p>Something new.</p>' }), responses: good, scripts: quick(ARTICLE) });
+  try {
+    const button = await waitFor(() => offerButton(page));
+    assert.match(statusText(page), /NYT put up something Read Free doesn't recognize/);
+    assert.ok(page.doc.documentElement.classList.contains('nytfix-off'));
+    await sleep(700); // the known-wall watch sees the popup on screen now: it must not act by itself
+    assert.deepEqual(page.fetched, []);
+    assert.deepEqual(await page.state(), { site: 'nyt', state: 'idle', mark: null, restored: false, missed: 'hidden', article: true });
+    const mail = page.doc.getElementById('nytfix-status').shadowRoot.querySelector('.offer a');
+    assert.match(mail.href, /^mailto:/);
+    assert.ok(!decodeURIComponent(mail.href).includes('nytimes.com'), 'never the address');
+    button.click();
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+    assert.equal(page.doc.documentElement.classList.contains('nytfix-off'), false);
+    assert.equal((await page.state()).missed, undefined);
+  } finally {
+    page.close();
+  }
+});
+
+test('a cut article with no wall to see: a note, and the article on request, held to a cut page', async () => {
+  const page = boot({ html: unknownWall({ upsell: 'inside', popup: '', shown: false }), responses: good, scripts: quick(ARTICLE) });
+  try {
+    const button = await waitFor(() => offerButton(page));
+    assert.match(statusText(page), /This page looks cut off/);
+    assert.equal(page.doc.documentElement.classList.contains('nytfix-off'), false, 'nothing of NYT is hidden, so nothing to show');
+    assert.deepEqual(page.fetched, []);
+    assert.equal((await page.state()).missed, 'cut');
+    await page.toggle(); // the menu's button does the same
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+    assert.ok(page.doc.documentElement.classList.contains('nytfix-active'), 'lifted, as a paywalled page is');
+    assert.ok(button);
+  } finally {
+    page.close();
+  }
+});
+
+test('a cut article asked for by hand is held to what a cut page shows: a copy made behind the paywall is not enough', async () => {
+  const page = boot({
+    html: unknownWall({ upsell: 'inside', popup: '', shown: false }),
+    responses: {
+      [timemapUrl(ARTICLE)]: ok(timemapFor(ARTICLE, [T[2], T[3]])),
+      [snapshotUrl(T[3])]: ok(BEHIND_PAYWALL),
+      [snapshotUrl(T[2])]: ok(COMPLETE),
+    },
+    scripts: quick(ARTICLE),
+  });
+  try {
+    (await waitFor(() => offerButton(page))).click();
+    await waitFor(page.body);
+    assert.equal(page.body().querySelectorAll('p').length, 12);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE), timemapUrl(ARTICLE), snapshotUrl(T[2])]);
+  } finally {
+    page.close();
+  }
+});
+
+test("a cut article the reader loaded and then put back: they chose NYT's version, so no note", async () => {
+  const page = boot({ html: unknownWall({ upsell: 'inside', popup: '', shown: false }), responses: good, scripts: quick(ARTICLE).map(s => s.replace('cutAfterMs = 100', 'cutAfterMs = 400')) });
+  try {
+    await page.started();
+    await page.toggle();
+    await waitFor(page.body);
+    await page.toggle();
+    assert.equal(page.body(), null);
+    await sleep(900);
+    assert.equal(offerButton(page) ?? null, null);
+    assert.equal((await page.state()).missed, undefined);
+  } finally {
+    page.close();
+  }
+});
+
+test('a cut article, asked for, and archive.today has nothing: the reader is told, and the page is not left held', async () => {
+  const page = boot({ html: unknownWall({ upsell: 'inside', popup: '', shown: false }), scripts: quick(ARTICLE) });
+  try {
+    (await waitFor(() => offerButton(page))).click();
+    await waitFor(() => page.banner());
+    assert.match(page.banner().textContent, /no snapshot of this article yet/);
+    assert.equal(page.doc.querySelector('[inert]'), null);
+  } finally {
+    page.close();
+  }
+});
+
+test('nothing at all on a wall-free article, one whose popup is filled but not shown, a known wall, or with Read Free off', async () => {
+  for (const [label, options] of [
+    ['wall-free', { html: livePageHtml({ wall: null }) }],
+    ['popup filled, not shown', { html: unknownWall({ shown: false }) }],
+    ['off on this site', { html: unknownWall({ popup: '<p>New.</p>' }), sync: memoryArea({ settings: { disabledSites: ['nyt'] } }) }],
+    ['Cooking', { url: 'https://cooking.nytimes.com/recipes/1-test', html: cookingLivePageHtml({ wall: false }) }],
+  ]) {
+    const page = boot({ responses: good, ...options, scripts: quick(options.url || ARTICLE) });
+    try {
+      await sleep(300);
+      assert.equal(offerButton(page), undefined, label);
+      assert.deepEqual(page.fetched, [], label);
+      assert.equal((await page.state()).missed, undefined, label);
+    } finally {
+      page.close();
+    }
+  }
+  const known = boot({ html: livePageHtml({ marks: 'parts', upsell: 'inside' }), responses: good, scripts: quick(ARTICLE) });
+  try {
+    await waitFor(known.body);
+    await sleep(300);
+    assert.equal(offerButton(known) ?? null, null);
+    await known.toggle(); // back to NYT's version, on request
+    await sleep(300);
+    assert.equal(offerButton(known) ?? null, null, 'the reader chose that');
+    assert.deepEqual(known.fetched, [newestUrl(ARTICLE)]);
+  } finally {
+    known.close();
+  }
+});
+
+test("an interactive page that still can't be scrolled once the wall is off: NYT's wall goes back up, with a note", async () => {
+  const STUCK = `Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, get() { return this.id === 'site-content' ? 8142 : 700; } });
+    Object.defineProperty(document, 'scrollingElement', { configurable: true, get: () => document.documentElement });`;
+  const page = boot({ url: INTERACTIVE, html: interactivePageHtml(), scripts: [STUCK, ...quick(INTERACTIVE)] });
+  try {
+    await waitFor(() => /couldn't free the scrolling/.test(statusText(page) || ''));
+    assert.ok(page.doc.documentElement.classList.contains('nytfix-off'));
+    assert.equal(page.doc.getElementById('site-content').style.position, 'fixed', 'as NYT had it');
+    assert.equal(page.mark(), null);
+    assert.equal(offerButton(page) ?? null, null, 'nothing to offer but the email');
+    assert.equal((await page.state()).missed, 'frozen');
+  } finally {
+    page.close();
+  }
+  const free = boot({ url: INTERACTIVE, html: interactivePageHtml(), scripts: quick(INTERACTIVE) });
+  try {
+    await waitFor(() => free.mark() === 'lifted');
+    await sleep(200);
+    assert.equal(free.mark(), 'lifted', 'a page that scrolls is left lifted');
+  } finally {
+    free.close();
+  }
+});
+
+test('Copy page details: answered on any page of the site, with no address or text in it', async () => {
+  const page = boot({ url: 'https://www.nytimes.com/section/world', html: interactivePageHtml(), scripts: quick('https://www.nytimes.com/section/world') });
+  try {
+    const reply = await page.details();
+    assert.match(reply.details, /on nyt; not-article/);
+    assert.ok(!/section|world|paragraph 1|logging in or creating/.test(reply.details), reply.details);
+  } finally {
+    page.close();
+  }
+});
+
+// The page can't be scrolled, whatever is lifted
+const STUCK_PAGE = `Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, get() { return this.id === 'site-content' ? 8142 : 700; } });
+  Object.defineProperty(document, 'scrollingElement', { configurable: true, get: () => document.documentElement });`;
+test("a paywalled article that can't be scrolled: the archived text stays, with a note; with none, NYT's wall goes back up", async () => {
+  const swapped = boot({ html: livePageHtml({ marks: 'parts', upsell: 'inside' }), responses: good, scripts: [STUCK_PAGE, ...quick(ARTICLE)] });
+  try {
+    await waitFor(() => /The article is in, but/.test(statusText(swapped) || ''));
+    assert.ok(swapped.body(), 'kept');
+    assert.equal(swapped.doc.documentElement.classList.contains('nytfix-off'), false);
+    assert.equal(swapped.mark(), 'swapped');
+    assert.equal((await swapped.state()).missed, 'stuck');
+  } finally {
+    swapped.close();
+  }
+  const nothing = boot({ html: livePageHtml({ marks: 'parts', upsell: 'inside' }), scripts: [STUCK_PAGE, ...quick(ARTICLE)] });
+  try {
+    await waitFor(() => /couldn't free the scrolling here, so NYT's wall is back/.test(statusText(nothing) || ''));
+    assert.ok(nothing.doc.documentElement.classList.contains('nytfix-off'));
+    assert.ok(nothing.doc.querySelector('section[name="articleBody"]').hasAttribute('inert'), 'as NYT had it');
+  } finally {
+    nothing.close();
+  }
+});
+
+test('a page that scrolls inside an element of its own is not frozen', async () => {
+  const INNER = `const css = window.getComputedStyle; window.getComputedStyle = (el, p) => (el.id === 'app' ? new Proxy(css(el, p), { get: (t, k) => (k === 'overflowY' ? 'auto' : typeof t[k] === 'function' ? t[k].bind(t) : t[k]) }) : css(el, p));
+    Object.defineProperty(Element.prototype, 'clientHeight', { configurable: true, get() { return 700; } });
+    Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, get() { return this.id === 'site-content' || this.id === 'app' ? 8142 : 700; } });
+    Object.defineProperty(document, 'scrollingElement', { configurable: true, get: () => document.documentElement });`;
+  const page = boot({ url: INTERACTIVE, html: interactivePageHtml(), scripts: [INNER, ...quick(INTERACTIVE)] });
+  try {
+    await waitFor(() => page.mark() === 'lifted');
+    await sleep(250);
+    assert.equal(page.mark(), 'lifted');
+    assert.equal((await page.state()).missed, undefined);
   } finally {
     page.close();
   }
