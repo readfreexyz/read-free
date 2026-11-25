@@ -102,10 +102,13 @@
     </section>
 
     <section class="card">
-      <h2>Saved articles</h2>
-      <p class="hint">Articles from archive.today are kept on this computer for 30 days (up to 50 MB,
-        oldest dropped first), so reloads and revisits are instant.</p>
+      <h2 id="saved-title" tabindex="-1">Saved articles <span class="count" id="saved-count"></span></h2>
+      <p class="hint">Articles whose text Read Free puts in are kept on this computer for 30 days (up to
+        50 MB, oldest dropped first), so reloads and revisits are instant. Nothing read in an incognito
+        or private window is saved.</p>
+      <ul class="saved-list" id="saved-list"></ul>
       <div class="row">
+        <button id="saved-more" type="button" class="nf-button" hidden></button>
         <button id="clear" type="button" class="nf-button">Clear saved articles</button>
         <span id="clear-status" class="saved" role="status" aria-live="polite"></span>
       </div>
@@ -132,6 +135,7 @@
   <script src="../src/tally.js"></script>
   <script src="../src/notify.js"></script>
   <script src="../ui/sites.js"></script>
+  <script src="saved.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

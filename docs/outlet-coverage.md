@@ -792,5 +792,7 @@ Not built:
 - **LA Times:** its metering popup comes up on more than stories (a gift guide at `/lifestyle/list/slug`, in a private window;
   seen in a screenshot, not in this Chrome). On the home page: 56 links to `/…/list/slug`, 18 to `/recipe/slug`, 4 to
   undated stories, 3 to `/espanol/…/articulo/DATE/slug`, 2 to projects. All but `articulo` (an article) only get it taken off.
+  With the meter up in the user's Chrome (2026-11-25), the gift guide was whole: the popup off, 29 gifts with their photos and
+  write-ups, about 41,900 px of page. The same in the user's incognito window (they had missed the gifts further down).
 - **FT, Der Spiegel, Le Monde, National Post, Haaretz** haven't been looked at again for this.
 

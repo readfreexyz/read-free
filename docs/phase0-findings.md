@@ -151,7 +151,12 @@ incognito window with extensions off.
 - **archive.today asked a script for a CAPTCHA, and not a page visit (seen once, the same day):** the snapshot of a cut
   article opened in a tab: the article (95 KB sent, 2.2 MB), twice, not from the cache. `fetch()` of the same address from that very page,
   with its cookies: 59 KB, a CAPTCHA. So there may be no check for the reader to complete. Read Free doesn't disguise
-  its requests to get past that.
+  its requests to get past that. On WSJ the same day the user got a CAPTCHA in the tab, and completing it worked, though
+  not in incognito: there Read Free's requests went with the regular window's cookies ("spanning", Chrome's default).
+  The manifest's `"incognito": "split"` made it count on stand-in pages (Chrome 158), but the user still couldn't get past
+  it in incognito with that, so it isn't used; there, Read Free links to the article on archive.today.
+- **archive.today can't be shown inside another page:** `X-Frame-Options: Deny` (2026-11-25). So the check is completed in
+  a small window of its own.
 - **CSP is permissive:** `img-src data: https: blob:`, `style-src 'unsafe-inline' https:`,
   no Trusted Types. Injected markup and either image source (archive or static01) will load.
 - **NYT uses DataDome:** a cookieless fetch of the article gets a 403 bot challenge. The extension

@@ -3,7 +3,7 @@
 // with "I've donated" (shown only when settings.TIP_URL is set).
 (async function () {
   'use strict';
-  const { archive, settings, cache: articleCache, ui, notify, tally, access } = globalThis.NYTFix;
+  const { archive, settings, cache: articleCache, ui, notify, tally, access, saved } = globalThis.NYTFix;
   const sync = chrome.storage.sync;
   const cache = articleCache.create(chrome.storage.local);
   const $ = id => document.getElementById(id);
@@ -191,20 +191,53 @@
 
   // Saved articles
   const clear = $('clear');
-  const size = bytes => (bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`);
-  const showCount = async () => {
-    const { articles: n, bytes } = await cache.usage();
-    clear.textContent = n ? `Clear ${n} saved article${n === 1 ? '' : 's'} (${size(bytes)})` : 'No saved articles';
-    clear.disabled = n === 0;
+  const SHOWN = 10; // the rest behind "Show all"
+  let showAll = false;
+  const siteName = hostname => ui.siteForHost(Object.fromEntries(sites.map(s => [s.id, s])), hostname)?.name || null;
+  const showSaved = async () => {
+    const articles = await cache.list();
+    const rows = saved.rows(articles, { siteName });
+    // Drawn again while the reader is in it: they stay on the same control of the same article, or
+    // of the one that took its place
+    const before = [...$('saved-list').children];
+    const at = before.findIndex(li => li.contains(document.activeElement));
+    const control = at < 0 ? null : document.activeElement.matches('button') ? 'button' : 'a';
+    const was = at < 0 ? null : before[at].querySelector('a').href;
+    $('saved-count').textContent = rows.length ? String(rows.length) : '';
+    $('saved-list').replaceChildren(...rows.slice(0, showAll ? rows.length : SHOWN).map(row => saved.build(document, row, removeSaved)));
+    $('saved-more').hidden = showAll || rows.length <= SHOWN;
+    $('saved-more').textContent = `Show all ${rows.length}`;
+    clear.textContent = articles.length ? `Clear all (${saved.total(articles)})` : 'No saved articles';
+    clear.disabled = articles.length === 0;
+    if (control) {
+      const after = [...$('saved-list').children];
+      const row = after.find(li => li.querySelector('a').href === was) || after[Math.min(at, after.length - 1)];
+      (row?.querySelector(control) || $('saved-title')).focus();
+    }
   };
+  async function removeSaved(row) {
+    await cache.remove(row.url);
+    await showSaved();
+    flash($('clear-status'), 'Removed');
+  }
+  $('saved-more').addEventListener('click', async () => {
+    showAll = true;
+    await showSaved();
+    $('saved-list').querySelectorAll('a')[SHOWN]?.focus();
+  });
   clear.addEventListener('click', async () => {
     await cache.clear();
-    await showCount();
+    await showSaved();
     flash($('clear-status'), 'Cleared');
   });
-  await showCount();
+  await showSaved();
+  // Saved, or run out, while this page is open
+  let redraw = null;
+  chrome.storage.onChanged?.addListener((changes, area) => {
+    if (area !== 'local' || !Object.keys(changes).some(key => key.startsWith(articleCache.INFO))) return;
+    clearTimeout(redraw);
+    redraw = setTimeout(showSaved, 100);
+  });
 
   // Donation link, and "I've donated" (on trust: the status bar stops offering the link)
   const tip = settings.tipLink();

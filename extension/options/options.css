@@ -110,3 +110,13 @@ select { min-height: 32px; padding: 5px 10px; border: 1px solid var(--nf-line); 
 .support-button:hover { border-color: var(--nf-support-text); background: var(--nf-support-text); filter: brightness(1.08); }
 /* "I've donated": the donation link stops coming up in the status bar */
 .donated { display: flex; flex: 1 0 100%; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--nf-support-text) 20%, transparent); cursor: pointer; }
+
+/* Saved articles */
+.saved-list { margin: 0 0 12px; padding: 0; list-style: none; }
+.saved-list:empty { margin: 0; }
+.saved-list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding: 6px 0; border-top: 1px solid var(--nf-line); }
+.saved-words { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.saved-words a { overflow-wrap: anywhere; color: inherit; font-weight: 600; text-decoration: none; }
+.saved-words a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.saved-meta { color: var(--nf-muted); font-size: 12px; }
+.saved-remove { flex: none; }

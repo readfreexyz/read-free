@@ -49,6 +49,10 @@
   const FROZEN_CHECK_MS = 2500;
 
   const cache = articleCache.create(chrome.storage.local);
+  const incognito = Boolean(chrome.extension?.inIncognitoContext);
+  // What an incognito window reads isn't kept on the computer (the settings page lists what is)
+  const remembering = incognito ? { put: async () => {}, putMissing: async () => {} } : cache;
+  const articleTitle = () => (document.querySelector('meta[property="og:title"]')?.content || document.querySelector('h1')?.textContent || document.title || '').replace(/\s+/g, ' ').trim();
   // The reader's settings (settings.js), loaded before the page is acted on and kept current.
   let prefs = null;
   const siteOn = () => !prefs || settingsLib.isOn(prefs, site.id);
@@ -136,6 +140,10 @@
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type === 'nytfix:state') {
       sendResponse({ site: site.id, state: pageState(), mark: iconMark?.state || null, restored: userRestored, ...(missed ? { missed, article: site.isArticle(location.pathname), inPage: Boolean(articleInPage()) } : {}) });
+      return false;
+    }
+    if (msg?.type === 'nytfix:checked') {
+      onChecked();
       return false;
     }
     // Copy page details (the menu): the page's structure, whatever kind of page it is
@@ -413,6 +421,8 @@
     stopWaiting();
     render.removeBanner(document);
     show(text);
+    // For the list on the settings page; and it stands in if the page stops sending it
+    remembering.put(site.normalizeUrl(location.href), text, { title: articleTitle() }).catch(warnCache);
     announce(null, `Removed ${site.shortName || site.name}'s wall. The whole article was in its page.`, 'page');
     return true;
   }
@@ -490,14 +500,15 @@
   // blocked: archive.today wants a CAPTCHA or is rate-limiting, so asking it another way won't help.
   // unreachable: no answer at all from that address (background.js), so another one may do.
   // timedOut: no whole answer in the time it was given.
-  // check: the archive.today page that wants a CAPTCHA.
+  // check: the archive.today page that wants a CAPTCHA; own: it asked for it for this article.
   class FixError extends Error {
-    constructor(message, { blocked = false, unreachable = false, timedOut = false, check = null } = {}) {
+    constructor(message, { blocked = false, unreachable = false, timedOut = false, check = null, own = false } = {}) {
       super(message);
       this.blocked = blocked;
       this.unreachable = unreachable;
       this.timedOut = timedOut;
       this.check = check;
+      this.own = own;
     }
   }
   const noAnswer = hosts => `Couldn't connect to ${hosts.length > 1 ? `archive.today: neither ${hosts.join(' nor ')} answered` : hosts[0]}. It may be down for a moment, or your network may be blocking it. Wait a minute and try again.`;
@@ -516,10 +527,11 @@
   // asked. It may not show one there: it can ask scripts for one and not a page the reader opens (the
   // user's Chrome, 2026-11-25: the article in a tab; a CAPTCHA to a script on that very page, with the
   // same cookies). Then the archived copy is there to read; Read Free doesn't pass its requests off as
-  // page visits. If there was one, its cookie goes with Read Free's own requests, so when the reader
+  // page visits. If there was one (as on WSJ that day), its cookie goes with Read Free's own requests, so when the reader
   // comes back the article is asked for again, once. A check completed from another article's page
   // counts too: this one sees that when the reader gets to it (nytfix:check).
   let stopWaiting = () => {};
+  let onChecked = () => {};
   function waitForCheck(check) {
     stopWaiting();
     const gen = generation;
@@ -539,11 +551,17 @@
     for (const [target, name] of events) target.addEventListener(name, back);
     stopWaiting = () => {
       for (const [target, name] of events) target.removeEventListener(name, back);
+      onChecked = () => {};
       stopWaiting = () => {};
     };
+    // The check's window loaded another page, or was closed (background.js). It can do so more than
+    // once; each asks again, unless one is on its way.
+    onChecked = () => { if (gen === generation && !loading && !(applied() && undoSwap)) retry(); };
     return {
-      text: 'Open the archived copy',
-      onClick: () => {
+      text: 'Complete the check',
+      onClick: async () => {
+        const inWindow = await chrome.runtime.sendMessage({ type: 'nytfix:openCheck', url: check }).catch(() => false);
+        if (inWindow) return;
         opened = true;
         window.open(check, '_blank', 'noopener');
       },
@@ -580,16 +598,18 @@
     }
     if (!res) throw new FixError("The extension's background worker didn't answer. Reload the page and try again.");
     const host = new URL(url).hostname;
-    const wantsCheck = check => new FixError(`${host} wants a CAPTCHA before it sends Read Free the article. Open the archived copy to read it there, or to complete the check if it shows one.`, { blocked: true, check: archive.isArchiveUrl(check) ? check : url });
+    const wantsCheck = (check, own) => new FixError(incognito
+      ? `${host} wants a CAPTCHA, which Read Free can't get past in ${settingsLib.isFirefox() ? 'a private' : 'an incognito'} window. Read the article on ${host} instead.`
+      : `${host} wants a CAPTCHA before it sends Read Free the article. Complete the check in a small window, and the article loads here by itself. If it shows the article instead, read it there.`, { blocked: true, check: archive.isArchiveUrl(check) ? check : url, own });
     if (!res.ok) {
-      if (res.reason === 'check') throw wantsCheck(res.check);
+      if (res.reason === 'check') throw wantsCheck(res.check, false); // another article's
       if (res.reason) console.info(`[Read Free] ${host}: ${res.error} (${res.reason})`);
       if (res.reason === 'unreachable') throw new FixError(noAnswer([host]), { unreachable: true });
       if (res.reason === 'cut-off') throw new FixError(`The connection to ${host} broke off before the page had arrived. Try again.`);
       throw new FixError(`Couldn't reach ${host}: ${res.error}.`, { timedOut: !res.reason });
     }
     const blocked = archive.looksBlocked(res.status, res.body);
-    if (blocked === 'captcha') throw wantsCheck(res.url); // the page that asked: often the snapshot, not the lookup
+    if (blocked === 'captcha') throw wantsCheck(res.url, true); // the page that asked: often the snapshot, not the lookup
     if (blocked === 'rate-limited') throw new FixError(`${host} is rate-limiting requests. Wait a minute and try again.`, { blocked: true });
     return res;
   }
@@ -619,7 +639,7 @@
       mirror = current.mirror;
       if (saved) {
         show(saved);
-        announce(status, 'Showing the archived article (saved copy).', 'saved');
+        announce(status, saved.snapshotUrl ? 'Showing the archived article (saved copy).' : 'Showing the saved article.', 'saved');
         return;
       }
 
@@ -685,7 +705,7 @@
         if (stale()) return;
         const memento = archive.mementoAt(res.url);
         if (!memento && res.status === 404) {
-          cache.putMissing(articleUrl).catch(warnCache);
+          remembering.putMissing(articleUrl).catch(warnCache);
           return noSnapshot(status, articleUrl, Date.now(), mirror, paywalled);
         }
         if (!memento || res.status !== 200) throw new FixError(`${mirror} answered ${res.status} when asked for the newest snapshot.`);
@@ -714,7 +734,7 @@
         mementos = tm.status === 200 ? archive.parseTimemap(tm.body) : [];
         if (!mementos.length && !tried.length) {
           if (tm.status !== 200 && tm.status !== 404) throw new FixError(`${mirror} answered ${tm.status} when listing snapshots.`);
-          cache.putMissing(articleUrl).catch(warnCache);
+          remembering.putMissing(articleUrl).catch(warnCache);
           return noSnapshot(status, articleUrl, Date.now(), mirror, paywalled);
         }
       } catch (e) {
@@ -761,7 +781,7 @@
       if (best.chars > live.chars) {
         show(best);
         announce(status, 'Showing the longest archive.today snapshot. It may be missing the end.', 'partial');
-        cache.put(articleUrl, best, { partial: true }).catch(warnCache);
+        remembering.put(articleUrl, best, { partial: true, title: articleTitle() }).catch(warnCache);
         return;
       }
       const which = tried.length > 1 ? `The ${tried.length} newest archive.today snapshots look` : 'The archive.today snapshot looks';
@@ -781,14 +801,20 @@
       if (e instanceof FixError) console.info('[Read Free]', e.message);
       else console.warn('[Read Free]', e);
       const message = e instanceof FixError ? e.message : `Something went wrong: ${e.message}`;
-      const check = e instanceof FixError && e.check ? waitForCheck(e.check) : null;
-      status.finish('error', message);
-      placeholder?.finish('error', `Couldn't load the rest of this article. ${message}`, { action: check || tryAgain });
+      const captcha = e instanceof FixError && e.check;
+      // In an incognito window a check doesn't count for Read Free's requests (they go with the
+      // regular window's cookies), so there's only reading it there. The snapshot that asked, if it
+      // was this article's; else the newest.
+      const page = captcha && incognito ? (e.own && archive.mementoAt(e.check) ? e.check : archive.newestUrl(articleUrl, mirror)) : null;
+      const readThere = page ? { text: `Open it on ${mirror}`, href: page } : null;
+      const check = captcha && !readThere ? waitForCheck(e.check) : null;
+      status.finish('error', message, readThere ? { link: readThere, hideAfterMs: 15000 } : {});
+      placeholder?.finish('error', `Couldn't load the rest of this article. ${message}`, { action: check || (readThere ? { text: readThere.text, onClick: () => window.open(page, '_blank', 'noopener') } : tryAgain) });
       showWallIfNothingToRead(paywalled);
       render.showBanner(document, site, {
         kind: 'error',
         message,
-        links: check ? [reportLink(message)] : [{ text: 'Open on archive.today', href: archive.searchUrl(articleUrl, mirror) }, reportLink(message)],
+        links: check ? [reportLink(message)] : [readThere || { text: 'Open on archive.today', href: archive.searchUrl(articleUrl, mirror) }, reportLink(message)],
         actions: check ? [check, tryAgain, dismiss] : [tryAgain, dismiss],
       });
     } finally {
@@ -812,7 +838,7 @@
     }
     show(snapshot);
     announce(status, 'Showing the archived article.', 'swapped');
-    cache.put(articleUrl, snapshot).catch(warnCache);
+    remembering.put(articleUrl, snapshot, { title: articleTitle() }).catch(warnCache);
   }
 
   function noSnapshot(status, articleUrl, checkedAt, mirror, paywalled) {

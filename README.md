@@ -225,9 +225,11 @@ otherwise stops extension storage at 10 MB).
   in with what happened, the outlet and the versions; never the article's address (paste it if you want that page looked at). Nothing is
   sent unless you send it.
 - **A CAPTCHA** is archive.today's to ask for and yours to complete; Read Free never goes around
-  one, or passes its requests off as page visits. **Open the archived copy** opens the page that
-  asked: archive.today may show you the article there, with no CAPTCHA, though it asked Read Free for
-  one. When you come back, Read Free tries again by itself; other articles that were waiting do so too, once that worked and you get to them. Until
+  one, or passes its requests off as page visits. **Complete the check** opens the page that asked in
+  a small window (archive.today doesn't allow itself to be shown inside another page). Once you have,
+  the article loads and the window closes. archive.today may show you the article there instead, with
+  no CAPTCHA, though it asked Read Free for one: read it there. In an incognito window a check doesn't
+  count for Read Free, so its notification links to the article on archive.today instead. Other articles that were waiting do so too, once that worked and you get to them. Until
   then, or for a minute, it doesn't ask archive.today for any other article. It asks for one
   article at a time, a second apart, starting with the one you're looking at, which may bring on fewer.
 - **A wall it doesn't recognize** (NYT for now; sites change their walls without warning):
@@ -263,7 +265,10 @@ otherwise stops extension storage at 10 MB).
   archive.today, archive.md, …). If the one in use can't be connected to, one other is tried
   (archive.is for archive.ph) before giving up; if it stays that way, pick another. Some networks
   and DNS services, Cloudflare's 1.1.1.1 among them, are known to block it.
-- **Clear saved articles:** forgets the articles kept for instant reloads.
+- **Saved articles:** the articles kept for instant reloads, newest first: the title (a link), outlet,
+  when it was saved and how big it is, with **Remove** for each and **Clear all**. From
+  archive.today or the outlet's own page (NYT, The Atlantic); nothing read in an incognito or private
+  window.
 - **Support the project**, at the bottom: the donation page (see [Donating](#donating)), and
   **I've donated. Don't ask again.**, which stops the status bar offering it.
 

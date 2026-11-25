@@ -15,9 +15,9 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 // page with no importScripts, given the same files first (tools/firefox.mjs), and a manifest with
 // Mozilla's settings. permissions: chrome.permissions, for Firefox (src/access.js). speed: its
 // timers run this much faster.
-function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); }, speed = 1, session = null, firefox = false, permissions = null } = {}) {
+function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); }, speed = 1, session = null, windows = false, firefox = false, permissions = null } = {}) {
   const calls = [];
-  const listeners = { message: [], changed: [], alarm: [], installed: [], removed: [] };
+  const listeners = { message: [], changed: [], alarm: [], installed: [], removed: [], updated: [], windowGone: [] };
   const alarms = {};
   const record = name => async details => { calls.push([name, details]); };
   const chrome = {
@@ -35,7 +35,8 @@ function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0',
       setTitle: record('title'),
       setIcon: record('icon'),
     },
-    tabs: { sendMessage: async () => ({}), create: record('tab'), onRemoved: { addListener: fn => listeners.removed.push(fn) } },
+    tabs: { sendMessage: async (id, msg) => { calls.push(['message', { id, ...msg }]); return {}; }, create: record('tab'), onRemoved: { addListener: fn => listeners.removed.push(fn) }, onUpdated: { addListener: fn => listeners.updated.push(fn) } },
+    ...(windows ? { windows: { get: async () => ({ left: 100, top: 50, width: 1400, height: 900 }), create: async details => { calls.push(['window', details]); return { id: 70, tabs: [{ id: 700 }] }; }, remove: async id => { calls.push(['closed', id]); for (const fn of listeners.windowGone) fn(id); }, onRemoved: { addListener: fn => listeners.windowGone.push(fn) } } } : {}),
     ...(permissions ? { permissions } : {}),
   };
   const context = vm.createContext({ chrome, console, setTimeout: (fn, ms) => setTimeout(fn, ms / speed), clearTimeout, setInterval, clearInterval, URL, AbortController, fetch });
@@ -56,7 +57,7 @@ function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0',
   const installed = reason => { for (const fn of listeners.installed) fn({ reason }); };
   // Plain copies: objects made inside the vm context have their own prototypes.
   const last = name => { const found = calls.filter(([n]) => n === name).pop()?.[1]; return found && JSON.parse(JSON.stringify(found)); };
-  return { calls, send, last, changeSettings, changeLocal, fireAlarm, installed, closeTab, alarms, context };
+  return { calls, send, last, changeSettings, changeLocal, fireAlarm, installed, closeTab, alarms, context, updated: (tabId, info) => { for (const fn of listeners.updated) fn(tabId, info); }, windowGone: id => { for (const fn of listeners.windowGone) fn(id); } };
 }
 
 test("toolbar mark: a green check on the tab's icon while the wall is off, cleared on request", async () => {
@@ -490,4 +491,56 @@ test('a check is forgotten after a minute; another address has none; a failure n
   session.data['nytfix:checks']['archive.ph'].at -= 60 * 1000 + 1;
   const later = archiveWorker({ session });
   assert.equal(await later.wanted(), false);
+});
+
+// Completing the check: the archive page in a small window over the reader's
+test('the check opens in a small window, in the same cookies; its second page asks again; an answer closes it', async () => {
+  const session = memoryArea();
+  let body = CAPTCHA;
+  const w = worker({ session, windows: true, speed: 100, fetch: async url => ({ status: 200, url, text: async () => body }) });
+  const openCheck = (url, tab = { id: 5, windowId: 9, incognito: false }) => new Promise(r => w.send({ type: 'nytfix:openCheck', url }, { id: 'nytfix', tab }, r));
+  const told = () => w.calls.filter(([n, d]) => n === 'message' && d.type === 'nytfix:checked').map(([, d]) => d.id);
+  assert.equal(await openCheck('https://evil.example/https://archive.ph/'), false, 'only archive.today');
+  assert.equal(await openCheck('https://archive.ph/x', null), false);
+  assert.equal(w.last('window'), undefined);
+  assert.equal(await openCheck('https://archive.ph/20261114130000/https://www.wsj.com/x'), true);
+  assert.deepEqual(w.last('window'), { url: 'https://archive.ph/20261114130000/https://www.wsj.com/x', type: 'popup', width: 520, height: 720, left: 540, top: 110 });
+  w.updated(700, { status: 'loading' });
+  w.updated(700, { status: 'complete' });
+  w.updated(123, { status: 'complete' });
+  await pause(20);
+  assert.deepEqual(told(), [], 'the check itself');
+  w.updated(700, { status: 'complete' });
+  await pause(20);
+  assert.deepEqual(told(), [5]);
+  const ask = () => new Promise(r => w.send({ type: 'nytfix:fetch', url: 'https://archive.ph/newest/x', timeoutMs: 90000, force: true }, { id: 'nytfix', tab: { id: 5 } }, r));
+  await ask();
+  await pause(20);
+  assert.equal(w.last('closed'), undefined, 'still a CAPTCHA: the window stays');
+  body = 'the article';
+  await ask();
+  await pause(30);
+  assert.equal(w.last('closed'), 70);
+  assert.deepEqual(told(), [5], 'closed by Read Free: nothing more to ask');
+});
+
+test('no check window from incognito; the reader closing one asks once; another tab has no part in it', async () => {
+  const w = worker({ session: memoryArea(), windows: true, fetch: async url => ({ status: 200, url, text: async () => 'the article' }) });
+  const openCheck = tab => new Promise(r => w.send({ type: 'nytfix:openCheck', url: 'https://archive.ph/x' }, { id: 'nytfix', tab }, r));
+  assert.equal(await openCheck({ id: 6, windowId: 9, incognito: true }), false);
+  assert.equal(w.last('window'), undefined, 'never in the regular window, with its history');
+  await openCheck({ id: 6, windowId: 9, incognito: false });
+  w.windowGone(70);
+  await pause(10);
+  assert.deepEqual(w.last('message'), { id: 6, type: 'nytfix:checked' });
+  w.windowGone(70);
+  await pause(10);
+  assert.equal(w.calls.filter(([n]) => n === 'message').length, 1);
+  // Another tab's article being answered is nothing to do with this one's check
+  await openCheck({ id: 6, windowId: 9, incognito: false });
+  await new Promise(r => w.send({ type: 'nytfix:fetch', url: 'https://archive.ph/newest/other', timeoutMs: 90000, force: true }, { id: 'nytfix', tab: { id: 8 } }, r));
+  await pause(20);
+  assert.equal(w.last('closed'), undefined);
+  const none = worker({ session: memoryArea() });
+  assert.equal(await new Promise(r => none.send({ type: 'nytfix:openCheck', url: 'https://archive.ph/x' }, { id: 'nytfix', tab: { id: 1 } }, r)), false, 'no windows here: a tab, then');
 });

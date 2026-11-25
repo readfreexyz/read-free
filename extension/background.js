@@ -134,6 +134,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     checkWanted(msg.host).then(check => sendResponse(Boolean(check)));
     return true;
   }
+  // Complete the check: the page that asked, in a small window over the reader's
+  if (msg?.type === 'nytfix:openCheck') {
+    openCheck(msg.url, sender.tab).then(sendResponse, () => sendResponse(false));
+    return true;
+  }
   // The reader is looking at that tab now (or isn't): its request goes first
   if (msg?.type === 'nytfix:looking') {
     for (const job of queue) if (job.tabId === sender.tab?.id) job.visible = Boolean(msg.visible);
@@ -182,6 +187,7 @@ function start(job) {
   self.NYTFix.update?.noteFetch?.(job.timeoutMs);
   fetchArchive(job.url, job.timeoutMs).then(async reply => {
     await noteCheck(hostOf(job.url), reply).catch(ignore);
+    if (reply.ok && archive.looksBlocked(reply.status, reply.body) === null && reply.status < 500) await closeCheck(job.tabId).catch(ignore);
     inFlight--;
     try { job.reply(reply); } catch { /* the page went away */ }
     pump();
@@ -295,3 +301,50 @@ async function fetchArchive(url, timeoutMs = 20000) {
     clearInterval(keepAlive);
   }
 }
+
+// Completing a CAPTCHA: the archive.today page that asked, in a small window (archive.today doesn't
+// allow itself to be shown inside another page), in the same cookies as Read Free's own requests: the
+// regular window's, so not from an incognito one (content.js). What's in it is between the
+// reader and archive.today. When it has loaded another page, or the reader closes it, the article
+// asks again; once that's answered, the window closes itself.
+const CHECK_WINDOW_KEY = 'nytfix:checkWindow';
+const CHECK_SIZE = { width: 520, height: 720 };
+const checkWindow = {
+  get: async () => (await chrome.storage.session?.get(CHECK_WINDOW_KEY).catch(ignore))?.[CHECK_WINDOW_KEY] || null,
+  set: value => chrome.storage.session?.set({ [CHECK_WINDOW_KEY]: value }),
+};
+async function openCheck(url, tab) {
+  if (!archive.isArchiveUrl(url) || !tab || tab.incognito || !chrome.windows?.create || !chrome.storage.session) return false;
+  const open = await checkWindow.get();
+  if (open) await chrome.windows.remove(open.windowId).catch(ignore); // one at a time
+  const over = await chrome.windows.get(tab.windowId).catch(() => null);
+  const place = over && Number.isFinite(over.left) && Number.isFinite(over.width)
+    ? { left: Math.round(over.left + Math.max(0, (over.width - CHECK_SIZE.width) / 2)), top: Math.round(over.top + Math.max(0, (over.height - CHECK_SIZE.height) / 3)) }
+    : {};
+  const win = await chrome.windows.create({ url, type: 'popup', ...CHECK_SIZE, ...place });
+  const tabId = win?.tabs?.[0]?.id;
+  if (tabId === undefined) return false;
+  await checkWindow.set({ windowId: win.id, tabId, forTab: tab.id, loads: 0 });
+  return true;
+}
+async function closeCheck(forTab) {
+  const open = await checkWindow.get();
+  if (!open || open.forTab !== forTab) return;
+  await checkWindow.set(null);
+  await chrome.windows.remove(open.windowId).catch(ignore);
+}
+const tellChecked = open => chrome.tabs.sendMessage(open.forTab, { type: 'nytfix:checked' }).catch(ignore);
+chrome.tabs.onUpdated?.addListener(async (tabId, info) => {
+  if (info.status !== 'complete') return;
+  const open = await checkWindow.get();
+  if (!open || open.tabId !== tabId) return;
+  open.loads += 1;
+  await checkWindow.set(open);
+  if (open.loads > 1) tellChecked(open); // the first is the check itself
+});
+chrome.windows?.onRemoved?.addListener(async windowId => {
+  const open = await checkWindow.get();
+  if (!open || open.windowId !== windowId) return;
+  await checkWindow.set(null);
+  tellChecked(open);
+});

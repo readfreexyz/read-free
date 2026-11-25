@@ -130,3 +130,43 @@ test('saving an article clears its "no snapshot yet" entry', async () => {
   assert.equal(await cache.getMissing(URL_A), null);
   assert.deepEqual(Object.keys(area.data).sort(), [`article:${URL_A}`, `info:${URL_A}`]);
 });
+
+test('list: what is saved, newest first, with its title; not what has run out, or a text with no info; remove forgets one', async () => {
+  const clock = { now: 1_000_000 };
+  const area = memoryArea({ settings: { mirror: 'archive.ph' } });
+  const cache = articleCache.create(area, { now: () => clock.now, ttlMs: 10_000, partialTtlMs: 500 });
+  const url = n => `https://www.nytimes.com/2026/11/14/world/${n}.html`;
+  await cache.put(url('old'), snapshot(1), { title: 'The old one' });
+  clock.now += 100;
+  await cache.put(url('part'), snapshot(2), { partial: true });
+  clock.now += 100;
+  await cache.put(url('new'), snapshot(3), { title: 'x'.repeat(400) });
+  await cache.putMissing(url('missing'));
+  let list = await cache.list();
+  assert.deepEqual(list.map(a => [a.url, a.savedAt, a.partial]), [[url('new'), 1_000_200, false], [url('part'), 1_000_100, true], [url('old'), 1_000_000, false]]);
+  assert.equal(list[2].title, 'The old one');
+  assert.equal(list[1].title, '');
+  assert.equal(list[0].title.length, 300);
+  assert.ok(list.every(a => a.bytes > 0));
+  assert.deepEqual(await cache.usage(), { articles: 3, bytes: list.reduce((n, a) => n + a.bytes, 0) });
+  clock.now += 450; // the partial one has run out, though it is still stored
+  assert.deepEqual((await cache.list()).map(a => a.url), [url('new'), url('old')]);
+  assert.equal((await cache.usage()).articles, 2);
+  area.data[`info:${url('ghost')}`] = { v: articleCache.VERSION, savedAt: clock.now, bytes: 5 };
+  assert.equal((await cache.list()).length, 2, 'info with no text');
+  await cache.remove(url('new'));
+  assert.deepEqual((await cache.list()).map(a => a.url), [url('old')]);
+  assert.equal(await cache.get(url('new')), null);
+  assert.ok(await cache.get(url('old')));
+  await cache.clear();
+  assert.deepEqual(Object.keys(area.data), ['settings']);
+});
+
+test("an article from the outlet's own page has no snapshot; what couldn't come along is kept with it", async () => {
+  const cache = articleCache.create(memoryArea());
+  const blocks = [{ type: 'paragraph', text: 'Text.' }];
+  await cache.put(URL_A, { blocks, left: 2, leftAs: ['photo or graphic', 'photos or graphics'] });
+  assert.deepEqual(await cache.get(URL_A), { blocks, snapshotUrl: undefined, snapshotTime: undefined, left: 2, leftAs: ['photo or graphic', 'photos or graphics'] });
+  await cache.put(URL_A, { blocks, left: 0 });
+  assert.deepEqual(await cache.get(URL_A), { blocks, snapshotUrl: undefined, snapshotTime: undefined });
+});

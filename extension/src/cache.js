@@ -14,8 +14,10 @@
 (function (root) {
   'use strict';
 
-  const ARTICLE = 'article:'; // the text: { v, savedAt, partial?, blocks, snapshotUrl, snapshotTime }
-  const INFO = 'info:';       // beside it: { v, savedAt, partial?, bytes }
+  // the text: { v, savedAt, partial?, blocks, snapshotUrl?, snapshotTime?, left?, leftAs? }. Without a
+  // snapshot, it's from the outlet's own page (render.apply)
+  const ARTICLE = 'article:';
+  const INFO = 'info:';       // beside it: { v, savedAt, partial?, bytes, title? }
   const MISSING = 'missing:'; // { v, savedAt }
   // Bump when the stored shape changes, so old entries are ignored (2: links and photos;
   // 3: info entries).
@@ -74,7 +76,7 @@
       if (drop.length) await area.remove([...new Set(drop)].filter(key => has.has(key)));
     }
 
-    // Returns { blocks, snapshotUrl, snapshotTime } or null.
+    // Returns { blocks, snapshotUrl, snapshotTime, left?, leftAs? } or null.
     async function get(url) {
       const { [ARTICLE + url]: entry } = await area.get(ARTICLE + url);
       if (!entry) return null;
@@ -82,15 +84,18 @@
         await area.remove([ARTICLE + url, INFO + url]);
         return null;
       }
-      return { blocks: entry.blocks, snapshotUrl: entry.snapshotUrl, snapshotTime: entry.snapshotTime };
+      const kept = { blocks: entry.blocks, snapshotUrl: entry.snapshotUrl, snapshotTime: entry.snapshotTime };
+      return entry.left ? { ...kept, left: entry.left, ...(entry.leftAs ? { leftAs: entry.leftAs } : {}) } : kept;
     }
 
     // partial: the snapshot may be missing its end, so keep it only for partialTtlMs.
-    async function put(url, { blocks, snapshotUrl, snapshotTime }, { partial = false } = {}) {
+    // title: the article's, for the list on the settings page.
+    async function put(url, { blocks, snapshotUrl, snapshotTime, left, leftAs }, { partial = false, title = '' } = {}) {
       const savedAt = now();
-      const entry = { v: VERSION, savedAt, blocks, snapshotUrl, snapshotTime };
+      const entry = { v: VERSION, savedAt, blocks, snapshotUrl, snapshotTime, ...(left ? { left, ...(leftAs ? { leftAs } : {}) } : {}) };
       const info = { v: VERSION, savedAt, bytes: 0 };
       if (partial) entry.partial = info.partial = true;
+      if (title) info.title = String(title).slice(0, 300);
       info.bytes = sizeOf(ARTICLE + url, entry) + sizeOf(INFO + url, info);
       // One set, so the text and its info are written together.
       await area.set({ [ARTICLE + url]: entry, [INFO + url]: info });
@@ -116,14 +121,28 @@
 
     const ours = key => key.startsWith(ARTICLE) || key.startsWith(INFO) || key.startsWith(MISSING);
 
-    // How many articles are saved, and roughly how many bytes they take (for the options page).
-    async function usage() {
-      const infoKeys = (await allKeys()).filter(key => key.startsWith(INFO));
+    // The saved articles, newest first (for the options page): { url, savedAt, bytes, partial, title }.
+    // Reads the info entries only. Not those that have run out, though they may not be gone yet.
+    async function list() {
+      const keys = await allKeys();
+      const has = new Set(keys);
+      const infoKeys = keys.filter(key => key.startsWith(INFO) && has.has(ARTICLE + key.slice(INFO.length)));
       const infos = infoKeys.length ? await area.get(infoKeys) : {};
-      return {
-        articles: infoKeys.length,
-        bytes: Object.values(infos).reduce((n, info) => n + (info.bytes || 0), 0),
-      };
+      return infoKeys
+        .filter(key => articleFresh(infos[key]))
+        .map(key => ({ url: key.slice(INFO.length), savedAt: infos[key].savedAt, bytes: infos[key].bytes || 0, partial: Boolean(infos[key].partial), title: infos[key].title || '' }))
+        .sort((a, b) => b.savedAt - a.savedAt);
+    }
+
+    // How many articles are saved, and roughly how many bytes they take.
+    async function usage() {
+      const articles = await list();
+      return { articles: articles.length, bytes: articles.reduce((n, a) => n + a.bytes, 0) };
+    }
+
+    // Forget one saved article.
+    async function remove(url) {
+      await area.remove([ARTICLE + url, INFO + url]);
     }
 
     // Forget every saved article and "no snapshot yet" answer. Other keys are left alone.
@@ -132,10 +151,10 @@
       if (keys.length) await area.remove(keys);
     }
 
-    return { get, put, getMissing, putMissing, usage, clear };
+    return { get, put, getMissing, putMissing, list, usage, remove, clear };
   }
 
-  const cache = { create, VERSION, TTL_MS, MISSING_TTL_MS, PARTIAL_TTL_MS, MAX_BYTES };
+  const cache = { create, INFO, VERSION, TTL_MS, MISSING_TTL_MS, PARTIAL_TTL_MS, MAX_BYTES };
   root.NYTFix = Object.assign(root.NYTFix || {}, { cache });
   if (typeof module === 'object' && module.exports) module.exports = cache;
 })(globalThis);
