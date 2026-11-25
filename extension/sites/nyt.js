@@ -15,14 +15,23 @@
 (function (root) {
   'use strict';
 
-  const LOGIN_WORDING = /without signing in|free to read/i;
+  // "To leave without signing in, use your browser's Back button."; "logging in" since Nov 2026.
+  const LOGIN_WORDING = /without (?:signing|logging) in|free to read/i;
   // The text is cut: the article body ends in NYT's "Subscribe to The Times to read as many
   // articles as you like." line (a short paragraph linking to /subscription). A login wall leaves
   // the whole story; the print-edition note under the article links to a subscription page too,
   // but sits outside the body.
-  const cutOff = doc => [...doc.querySelectorAll('section[name="articleBody"] a[href*="/subscription"]')]
-    .some(a => { const line = a.closest('p, div'); return Boolean(line) && line.textContent.trim().length < 200; });
+  // On a page with no article body (live blogs, interactive pages) the line has to say so in words.
+  const cutOff = doc => {
+    const body = doc.querySelector('section[name="articleBody"]');
+    return [...(body || doc).querySelectorAll(body ? 'a[href*="/subscription"]' : 'main a[href*="/subscription"]')].some(a => {
+      const line = a.closest('p, div');
+      const text = line ? line.textContent.trim() : '';
+      return Boolean(line) && text.length < 200 && (Boolean(body) || /subscribe to (?:the times|keep|read|continue)/i.test(text));
+    });
+  };
 
+  const PINNED = 'main#site-content[style*="position: fixed"]';
   const news = {
     id: 'nyt',
     name: 'The New York Times',
@@ -30,8 +39,10 @@
     hosts: ['www.nytimes.com', 'cooking.nytimes.com'],
 
     // Articles: /2026/11/14/world/europe/slug.html. Live blogs: /live/2026/11/13/us/slug.
+    // Interactive pages: /interactive/2026/11/24/climate/slug.html, or with no date; handled as
+    // live blogs are: a login wall comes off; there's no text to swap in.
     isArticle: path => /^\/\d{4}\/\d{2}\/\d{2}\/.+\.html$/.test(path),
-    isLive: path => /^\/live\/\d{4}\/\d{2}\/\d{2}\//.test(path),
+    isLive: path => /^\/(?:live\/\d{4}\/\d{2}\/\d{2}\/|interactive\/.)/.test(path),
     // Drop the query string and fragment (?smid=…, #comments) and force the www host, because
     // archive.today looks snapshots up by exact URL.
     normalizeUrl: href => `https://www.nytimes.com${new URL(href).pathname}`,
@@ -43,7 +54,15 @@
       upsellLink: 'a[href*="/subscription"]', // "Subscribe to The Times…" line under cut-off text
       wall: {
         popup: '#gateway-content',        // filled while a wall is up (hidden by nyt.css)
-        inert: '#site-content[inert], main[inert]', // NYT makes the page inert under a wall
+        // NYT makes the page inert under a wall: main until Nov 2026, and since then the article
+        // body and several divs, one by one (the user's Chrome, 2026-11-25).
+        // Interactive pages have nothing inert: main is pinned by inline styles (position: fixed;
+        // width: 100%; margin-top: 0px), so the document has no height to scroll (the same day).
+        inert: `#site-content[inert], main[inert], section[name="articleBody"][inert], ${PINNED}`,
+        pinned: 'main#site-content', // unpinned while the wall is off (and by nyt.css at once)
+        // nyt.css hides the wall on every page; where Read Free doesn't act, nothing would undo the
+        // rest (a pinned page with no wall to see), so the site's own wall shows there.
+        elsewhere: 'show',
         container: '[data-testid="vi-gateway-container"]', // its positioned children are scrims
         login: LOGIN_WORDING, // the login wall's popup wording
         // 'login' only when the popup says so and the text isn't cut. Since Nov 2026 the paywall's

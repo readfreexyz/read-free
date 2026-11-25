@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const paywall = require('../extension/src/paywall.js');
 const nyt = require('../extension/sites/nyt.js');
-const { parse, livePageHtml, raiseWall } = require('./fixtures.js');
+const { parse, livePageHtml, interactivePageHtml, raiseWall } = require('./fixtures.js');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -27,6 +27,70 @@ test('an empty popup, or a page that is not inert, is not a wall', () => {
   const notInert = parse(livePageHtml({ wall: 'paywall' }));
   notInert.getElementById('site-content').removeAttribute('inert');
   assert.equal(paywall.isActive(notInert, nyt), false);
+});
+
+// The user's Chrome, 2026-11-25: main#site-content isn't inert any more; the article body and
+// several divs are, one by one.
+test("NYT's wall since Nov 2026: the article body is inert, not the whole page", () => {
+  const up = parse(livePageHtml({ marks: 'parts', upsell: 'inside' }));
+  assert.equal(up.getElementById('site-content').hasAttribute('inert'), false);
+  assert.equal(paywall.isActive(up, nyt), true);
+  assert.equal(paywall.wallType(up, nyt), 'paywall');
+
+  const emptyPopup = parse(livePageHtml({ marks: 'parts' }));
+  emptyPopup.getElementById('gateway-content').innerHTML = '';
+  assert.equal(paywall.isActive(emptyPopup, nyt), false, 'inert, but no popup');
+
+  const onlyElsewhere = parse(livePageHtml({ marks: 'parts' }));
+  onlyElsewhere.querySelector('section[name="articleBody"]').removeAttribute('inert');
+  assert.equal(paywall.isActive(onlyElsewhere, nyt), false, 'something else inert (a closed menu, say), not the article');
+});
+
+test("the wall's note says \"logging in\" since Nov 2026: whole text is the login wall, cut text the paywall", () => {
+  assert.equal(paywall.wallType(parse(livePageHtml({ marks: 'parts' })), nyt), 'login');
+  assert.equal(paywall.wallType(parse(livePageHtml({ marks: 'parts', upsell: 'inside' })), nyt), 'paywall');
+});
+
+// The note is the same on both walls, so on a page with no article body only the subscription line
+// can say it's the paywall.
+test('no article body: a "Subscribe to…" line in the page makes it the paywall; a print note does not', () => {
+  const line = text => {
+    const doc = parse(interactivePageHtml());
+    doc.querySelector('main').insertAdjacentHTML('beforeend', `<div><p>${text}</p></div>`);
+    return paywall.wallType(doc, nyt);
+  };
+  assert.equal(line('<a href="https://www.nytimes.com/subscription?campaignId=X">Subscribe to The Times</a> to read as many articles as you like.'), 'paywall');
+  assert.equal(line('A version of this article appears in print. <a href="https://www.nytimes.com/subscriptions/Multiproduct/x.html">Order Reprints</a> | Today’s Paper | <a href="https://www.nytimes.com/subscriptions/x">Subscribe</a>'), 'login');
+  assert.equal(line('Nothing about subscriptions.'), 'login');
+});
+
+test('interactive pages: with or without a date in the address', () => {
+  for (const path of ['/interactive/2026/11/24/climate/x.html', '/interactive/2021/us/covid-cases.html', '/interactive/projects/x/']) assert.equal(nyt.isLive(path), true, path);
+  for (const path of ['/interactive/', '/section/world', '/', '/2026/11/24/climate/x.html', '/live/latest']) assert.equal(nyt.isLive(path), false, path);
+});
+
+test('an interactive page under the login wall: pinned in place, nothing inert', () => {
+  const up = parse(interactivePageHtml());
+  assert.equal(up.querySelector('[inert]'), null);
+  assert.equal(paywall.isActive(up, nyt), true);
+  assert.equal(paywall.wallType(up, nyt), 'login');
+  assert.equal(paywall.isActive(parse(interactivePageHtml({ wall: null })), nyt), false);
+  const otherStyle = parse(interactivePageHtml());
+  otherStyle.getElementById('site-content').setAttribute('style', 'width: 100%');
+  assert.equal(paywall.isActive(otherStyle, nyt), false, 'some other inline style');
+  const pinnedOnly = parse(interactivePageHtml());
+  pinnedOnly.getElementById('gateway-content').innerHTML = '';
+  assert.equal(paywall.isActive(pinnedOnly, nyt), false, 'pinned (a menu, say), but no popup');
+});
+
+test('watch reacts to it going up, too, before the next paint', async () => {
+  const doc = parse(livePageHtml({ wall: null }));
+  let calls = 0;
+  const stop = paywall.watch(doc, nyt, () => calls++, { intervalMs: 60000 });
+  raiseWall(doc, 'paywall', { marks: 'parts' });
+  await sleep(0);
+  assert.equal(calls, 1);
+  stop();
 });
 
 test('a popup visibly on screen counts too (NYT\'s version, shown on request)', () => {

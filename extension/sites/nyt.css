@@ -16,6 +16,12 @@ html:not(.nytfix-off) [data-testid="vi-gateway-container"] {
   max-height: none !important;
   overflow: visible !important;
 }
+/* Interactive pages: under a wall NYT pins main with inline styles (position: fixed; margin-top: minus
+   how far the reader had scrolled). Kept in the page's flow, it scrolls, and the reader stays put. */
+html:not(.nytfix-off):has(#gateway-content > *) main#site-content[style*="position: fixed"] {
+  position: relative !important;
+  margin-top: 0 !important;
+}
 
 /* NYT Cooking: its script clips the recipe to 250px, and draws a sign-up box over it. */
 html:not(.nytfix-off) [class*="recipebody_body-container"][class*="truncator"] {

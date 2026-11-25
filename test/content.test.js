@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const manifest = require('../extension/manifest.json');
-const { livePageHtml, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
+const { livePageHtml, interactivePageHtml, pinInteractive, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
 const { VERSION: CACHE_VERSION } = require('../extension/src/cache.js');
 const archive = require('../extension/src/archive.js');
 
@@ -161,6 +161,49 @@ test('swaps in the newest snapshot as soon as the paywall shows, and saves it', 
     assert.equal(page.body().querySelector('p a').href, 'https://www.nytimes.com/2026/01/01/world/other.html');
     assert.equal(page.body().querySelector('figure img').src, 'https://static01.nyt.com/images/2026/11/11/multimedia/photo.jpg');
     await waitFor(() => page.storage.data[`article:${ARTICLE}`]);
+  } finally {
+    page.close();
+  }
+});
+
+// NYT since 2026-11-25 (the user's Chrome): the article body and other parts are inert, not main.
+test("NYT's wall since Nov 2026: the article goes in, every part is usable again, and undo puts the wall back as it was", async () => {
+  const parts = ['section[name="articleBody"]', '#story > header', 'aside.related', '.masthead-row'];
+  const html = livePageHtml({ marks: 'parts', upsell: 'inside' });
+  const page = boot({ html, responses: { [timemapUrl(ARTICLE)]: ok(timemapFor(ARTICLE, [T[3]])), [snapshotUrl(T[3])]: ok(COMPLETE) } });
+  try {
+    await waitFor(page.body);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+    assert.equal(page.mark(), 'swapped');
+    for (const part of parts) {
+      const el = page.doc.querySelector(part);
+      assert.equal(el.hasAttribute('inert'), false, `${part} can be clicked`);
+      assert.equal(el.hasAttribute('aria-hidden'), false, `${part} can be read by a screen reader`);
+    }
+    assert.equal(page.body().closest('[inert], [aria-hidden="true"]'), null);
+    await waitFor(() => page.storage.data[`article:${ARTICLE}`]);
+    assert.equal((await page.toggle()).state, 'idle');
+    for (const part of parts) {
+      const el = page.doc.querySelector(part);
+      assert.ok(el.hasAttribute('inert'), `${part} as NYT had it`);
+      assert.equal(el.getAttribute('aria-hidden'), 'true', part);
+    }
+  } finally {
+    page.close();
+  }
+});
+
+test("NYT's wall since Nov 2026, going up after the page is drawn, and put back by NYT afterwards", async () => {
+  const page = boot({ html: livePageHtml({ wall: null, upsell: 'inside' }), responses: { [timemapUrl(ARTICLE)]: ok(timemapFor(ARTICLE, [T[3]])), [snapshotUrl(T[3])]: ok(COMPLETE) } });
+  try {
+    await page.started();
+    assert.deepEqual(page.fetched, [], 'no wall yet: nothing is asked for');
+    raiseWall(page.doc, 'paywall', { marks: 'parts' });
+    await waitFor(page.body);
+    const section = page.doc.querySelector('section[name="articleBody"]');
+    section.setAttribute('inert', '');
+    section.setAttribute('aria-hidden', 'true');
+    await waitFor(() => !section.hasAttribute('inert') && !section.hasAttribute('aria-hidden'));
   } finally {
     page.close();
   }
@@ -857,6 +900,71 @@ test('login wall on a live blog is lifted too', async () => {
   }
 });
 
+const INTERACTIVE = 'https://www.nytimes.com/interactive/2026/11/24/climate/test-interactive.html';
+test('login wall on an interactive page: unpinned, nothing fetched; undo pins it again', async () => {
+  const page = boot({ url: INTERACTIVE, html: interactivePageHtml({ scrolled: 300 }) });
+  try {
+    const main = page.doc.getElementById('site-content');
+    await waitFor(() => main.style.position === '');
+    assert.equal(main.style.width, '');
+    assert.equal(main.style.marginTop, '');
+    assert.deepEqual(page.fetched, []);
+    assert.equal(page.mark(), 'lifted');
+    assert.match(statusText(page), /Removed NYT's wall/);
+    main.setAttribute('style', 'position: fixed; width: 100%; margin-top: -300px;'); // NYT pins it again
+    await waitFor(() => main.style.position === '');
+    assert.equal((await page.toggle()).state, 'idle');
+    assert.equal(main.style.position, 'fixed', "NYT's version: as NYT had it");
+    assert.equal(main.style.width, '100%');
+    assert.equal(main.style.marginTop, '-300px');
+    assert.ok(page.doc.documentElement.classList.contains('nytfix-off'));
+    assert.deepEqual(page.fetched, []);
+  } finally {
+    page.close();
+  }
+});
+
+test('login wall on an interactive page, going up after the page is drawn', async () => {
+  const page = boot({ url: INTERACTIVE, html: interactivePageHtml({ wall: null }) });
+  try {
+    await page.started();
+    assert.equal(page.mark(), null);
+    pinInteractive(page.doc);
+    await waitFor(() => page.mark() === 'lifted');
+    assert.equal(page.doc.getElementById('site-content').style.position, '');
+    assert.deepEqual(page.fetched, []);
+  } finally {
+    page.close();
+  }
+});
+
+test("an NYT page Read Free doesn't work on: its wall is left showing, not hidden with the page still held", async () => {
+  for (const url of ['https://www.nytimes.com/es/2026/11/24/espanol/test.html', 'https://www.nytimes.com/section/world']) {
+    const page = boot({ url, html: interactivePageHtml() });
+    try {
+      await waitFor(() => page.doc.documentElement.classList.contains('nytfix-off'));
+      assert.equal(page.doc.getElementById('site-content').style.position, 'fixed');
+      assert.equal((await page.toggle()).state, 'not-article');
+      assert.deepEqual(page.fetched, []);
+    } finally {
+      page.close();
+    }
+  }
+});
+
+test("paywall on an interactive page, with the new note: the subscription line gives it away, and NYT's wall is shown", async () => {
+  const html = interactivePageHtml().replace('</main>', '<div><p><a href="https://www.nytimes.com/subscription?x">Subscribe to The Times</a> to read as many articles as you like.</p></div></main>');
+  const page = boot({ url: INTERACTIVE, html });
+  try {
+    await waitFor(() => page.doc.documentElement.classList.contains('nytfix-off'));
+    assert.equal(page.doc.getElementById('site-content').style.position, 'fixed');
+    assert.equal(page.mark(), null);
+    assert.deepEqual(page.fetched, []);
+  } finally {
+    page.close();
+  }
+});
+
 test("paywall on a live blog: NYT's wall is shown as it is, and the toolbar explains why", async () => {
   const page = boot({ url: LIVE, html: livePageHtml({ wall: 'paywall', section: false }) });
   try {
@@ -865,7 +973,7 @@ test("paywall on a live blog: NYT's wall is shown as it is, and the toolbar expl
     assert.ok(page.doc.getElementById('site-content').hasAttribute('inert'));
     assert.ok(page.doc.documentElement.classList.contains('nytfix-off'));
     await page.toggle();
-    assert.match(statusText(page), /Live blogs behind NYT's paywall aren't supported yet/);
+    assert.match(statusText(page), /Pages like this one behind NYT's paywall aren't supported yet/);
     assert.deepEqual(page.fetched, []);
   } finally {
     page.close();

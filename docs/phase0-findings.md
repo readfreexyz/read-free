@@ -116,6 +116,19 @@ incognito window with extensions off.
     a MutationObserver so `inert` and the scrim are gone before the next paint.
   - Live blogs have no `section[name="articleBody"]`. They're a feed of `live-blog-post` / `FeedItem`
     elements, so they'd need their own extractor for the archive path.
+- **The wall changed (2026-11-25, the user's Chrome, signed out, a cut article):** `main#site-content` isn't
+  `inert` any more. `section[name="articleBody"]` is (`inert` + `aria-hidden="true"`), and so are eight `div`s,
+  one by one. `#gateway-content` still fills: a note for screen readers (`p#gateway-exit-advisory`, 83
+  characters) and one more element; its wording no longer says "without signing in" (below). There's a
+  `[data-testid="gateway-backdrop"]` next to it. The body still ends in the subscription line, with 5
+  paragraphs of the article before it. Read Free saw no wall, since it looked for `inert` on main only
+  (fixed: the article body counts too). Live blogs under this version haven't been looked at.
+- **The login wall on an interactive page (`/interactive/2026/11/24/climate/…`, the same day):** no `article#story` or
+  `section[name="articleBody"]`, nothing `inert`, and `main#site-content` isn't inside `vi-gateway-container`. `main` is
+  pinned by inline styles instead (`position: fixed; width: 100%; margin-top: 0px`), so the document is only as tall as
+  the window and can't scroll. The note reads "To leave without logging in or creating an account, use your browser's
+  Back button" (it used to say "signing in"). All the text was there (221 `<p>`). Read Free ignored `/interactive/`
+  while its CSS hid the wall, which left the page frozen at the top.
 - **CSP is permissive:** `img-src data: https: blob:`, `style-src 'unsafe-inline' https:`,
   no Trusted Types. Injected markup and either image source (archive or static01) will load.
 - **NYT uses DataDome:** a cookieless fetch of the article gets a 403 bot challenge. The extension

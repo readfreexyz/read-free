@@ -179,7 +179,7 @@ otherwise stops extension storage at 10 MB).
 
 - **Login wall** ("This story is free to read. Log in to continue."): the whole story is already
   on the page under the wall, so hiding the wall is all there is to do, with no archive.today
-  request. This works on articles and live blogs.
+  request. This works on articles, live blogs and interactive pages.
 - **Paywall:** the wall is gone right away, so you can read the first paragraphs while
   archive.today loads. Where NYT's text stops, a "Loading the rest of this article…"
   placeholder stands in for NYT's subscription line, lined up with the text column. If
@@ -197,7 +197,9 @@ otherwise stops extension storage at 10 MB).
   with the details each time.
 - **To undo:** **Show the site's version** in the toolbar menu, or **Show NYT's version** in the banner. NYT's page comes
   back as it was, wall included, and the extension won't change that page again on its own.
-- **Live blogs behind the paywall** can't be fixed yet, so NYT's paywall is left showing there.
+- **Live blogs and interactive pages behind the paywall** can't be fixed yet, so NYT's paywall is
+  left showing there, when the page says it's one (a "Subscribe to The Times" line). So is any wall
+  on an NYT page Read Free doesn't work on (a section page, NYT en Español).
 - **To swap by hand:** **Load from archive.today** in the toolbar menu, for example on a page with no paywall. If the page
   already has the full text, nothing is replaced and the banner offers **Use the snapshot anyway**.
 - **Incomplete snapshots:** a snapshot captured behind the paywall has barely more text than
@@ -444,9 +446,11 @@ both.
 - In-page navigation handling has only been tested on a simulated page, not on nytimes.com itself.
 - Lifting the paywall (popup, gradient scrim and `inert`) is based on one paywalled article.
   Other article templates may differ.
-- Telling NYT's login wall from its paywall: the popup's wording ("without signing in", "free to
-  read") only counts when the article isn't cut. Since Nov 2026 the paywall's popup carries the
+- Telling NYT's login wall from its paywall: the popup's wording ("without signing in" or
+  "logging in", "free to read") only counts when the article isn't cut. Since Nov 2026 the paywall's popup carries the
   "To leave without signing in" note too, so an article body ending in "Subscribe to The Times to
   read as many articles as you like" is always the paywall. The console logs each decision with
   the popup's wording.
-- Live blogs behind the paywall aren't supported. Live blogs behind the login wall are.
+- Live blogs and interactive pages behind the paywall aren't supported. Those behind the login wall
+  are. Their popups carry the same note, so a paywall without a "Subscribe to The Times" line in the
+  page would be taken for the login wall, and lifted with whatever text NYT sent.

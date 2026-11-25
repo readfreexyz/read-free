@@ -358,7 +358,8 @@
   // the pinned container are handled by nyt.css):
   // - hide positioned children of the wall container (NYT's gradient scrim);
   // - remove `inert` / aria-hidden="true" from the article's ancestors and from anything inert
-  //   inside the page content, which otherwise makes every link and button unclickable;
+  //   inside the page content or next to it, which otherwise makes every link and button
+  //   unclickable;
   // - hide the wall's own elements (wall.hide, and those of the paywall services in
   //   wall.services), for sites without CSS of their own;
   // - show text the site sent but hid (wall.reveal: cut to a few lines, faded, display: none);
@@ -367,6 +368,7 @@
   //   (the Daily Mail: body.is-paywall-processed);
   // - unlock scrolling (wall.unlockScroll), if the wall set overflow: hidden on <html> or <body>
   //   or pinned <body> in place.
+  // - let go of an element the wall pinned with inline styles (wall.pinned: NYT's interactive pages).
   // Keeps doing so if the site re-applies them or draws its wall again. Returns an undo function.
   function liftPaywall(doc, site) {
     const win = doc.defaultView;
@@ -402,7 +404,20 @@
       el.removeAttribute(name);
     };
 
+    const PIN_PROPERTIES = ['position', 'width', 'top', 'margin-top'];
+    const unpinned = []; // [element, [[property, value, priority]]], as it was first pinned
+    const unpin = el => {
+      if (el.style.position !== 'fixed') return;
+      const was = PIN_PROPERTIES.map(p => [p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+      if (!unpinned.some(([e]) => e === el)) unpinned.push([el, was]);
+      const offset = parseFloat(el.style.marginTop || el.style.top) || 0;
+      for (const p of PIN_PROPERTIES) el.style.removeProperty(p);
+      // Pinned at minus how far the reader had scrolled: if the page was sent to the top, go back
+      if (offset < 0 && win.scrollY === 0) win.scrollTo({ top: -offset, behavior: 'instant' });
+    };
+
     const sweep = () => {
+      if (wall.pinned) for (const el of doc.querySelectorAll(wall.pinned)) unpin(el);
       // Positioned children of the wall container are overlays (the scrim). The masthead and
       // the page content are static children and are left alone.
       for (const child of container ? container.children : []) {
@@ -417,7 +432,16 @@
         unset(n, 'inert');
         if (n.getAttribute('aria-hidden') === 'true') unset(n, 'aria-hidden');
       }
-      for (const el of doc.querySelectorAll(`${mainSelector} [inert]`)) unset(el, 'inert');
+      const setFree = el => {
+        unset(el, 'inert');
+        // On a site whose wall makes the page inert, aria-hidden comes with it
+        if (wall.inert && el.getAttribute('aria-hidden') === 'true') unset(el, 'aria-hidden');
+      };
+      for (const el of doc.querySelectorAll(`${mainSelector} [inert]`)) setFree(el);
+      const popup = wall.popup ? doc.querySelector(wall.popup) : null;
+      for (const child of container ? container.children : []) {
+        if (child.hasAttribute('inert') && !child.contains(popup)) setFree(child); // NYT's masthead
+      }
       if (hideSelector) for (const el of doc.querySelectorAll(hideSelector)) mark(el, HIDDEN_ATTR);
       if (revealSelector) {
         for (const el of doc.querySelectorAll(revealSelector)) {
@@ -474,6 +498,11 @@
       added.observe(doc.body, { childList: true, subtree: true });
       observers.push(added);
     }
+    if (wall.pinned) {
+      const pins = new win.MutationObserver(sweep);
+      for (const el of doc.querySelectorAll(wall.pinned)) pins.observe(el, { attributes: true, attributeFilter: ['style'] });
+      observers.push(pins);
+    }
     if (classEntries.length) {
       // The site may take the classes off again.
       const classes = new win.MutationObserver(sweep);
@@ -485,13 +514,14 @@
       for (const el of [doc.documentElement, doc.body]) if (el) locks.observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
       observers.push(locks);
     }
-    if (hidden.length || changed.length || marked.length || forced.length || classesAdded.length) {
+    if (hidden.length || changed.length || marked.length || forced.length || classesAdded.length || unpinned.length) {
       const name = e => `${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''}`;
       console.info('[Read Free] lifted paywall:', {
         overlaysHidden: hidden.length,
         attributesRemoved: changed.map(([e, n]) => `${name(e)} ${n}`),
         marked: marked.map(([e, n]) => `${name(e)} ${n}`),
         classesAdded: classesAdded.map(([e, c]) => `${name(e)} .${c}`),
+        unpinned: unpinned.map(([e]) => name(e)),
       });
     }
 
@@ -506,7 +536,10 @@
       }
       for (const [el, name] of marked) el.removeAttribute(name);
       for (const [el, name] of classesAdded) el.classList.remove(name);
-      if (restoreAttributes) for (const [el, name, value] of changed) el.setAttribute(name, value);
+      if (restoreAttributes) {
+        for (const [el, name, value] of changed) el.setAttribute(name, value);
+        for (const [el, was] of unpinned) for (const [p, value, priority] of was) if (value) el.style.setProperty(p, value, priority);
+      }
     };
   }
 

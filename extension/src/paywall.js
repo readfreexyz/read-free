@@ -1,7 +1,7 @@
 // Detects a site's walls, from the selectors in its adapter (site.live.wall). On NYT, per the
 // incognito diagnostics (docs/phase0-findings.md): when a wall is up NYT fills the popup and
-// makes the page content `inert`; without one (and always for subscribers) the popup is empty
-// and nothing is inert.
+// makes the page content `inert` (since Nov 2026, parts of it); without one (and always for
+// subscribers) the popup is empty and nothing is inert.
 //
 // Site CSS hides the popup before it can be drawn, so it measures 0×0 even when it's up. That's
 // why detection reads the DOM instead of the popup's size.
@@ -11,8 +11,8 @@
   const wallOf = site => (site && site.live && site.live.wall) || null;
 
   // A wall is up: the popup has content and, on sites that do this (wall.inert), the page has
-  // been made inert. FT has no inert: its "popup" is a whole barrier page. No layout involved,
-  // so it's cheap enough to check on every DOM change.
+  // been made inert (or, NYT's interactive pages, pinned in place). FT has no inert: its "popup"
+  // is a whole barrier page. No layout involved, so it's cheap enough to check on every DOM change.
   //
   // A site whose wall isn't a popup can say how to spot it instead (wall.detect: The Atlantic
   // cuts the text with no visible gate). Keep it cheap: it also runs on DOM changes.

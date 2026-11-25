@@ -173,7 +173,11 @@
         keepPlace(before.place);
       },
     });
-    if (!supportedPage()) return;
+    if (!supportedPage()) {
+      // Site CSS hides the wall on every page of the site (wall.elsewhere: 'show': NYT)
+      if (site.live.wall?.elsewhere === 'show') render.showWall(document);
+      return;
+    }
     pageGuard('hold');
     // A wall that deletes the article from the page (Corriere's private-browsing one): put it
     // back as it goes, so lifting the wall leaves the article, not a blank page.
@@ -235,7 +239,9 @@
       const decision = site.live.wall.decision;
       const undecided = Boolean(decision) && !siteCut && decision.pending(document);
       lift();
-      const message = site.live.wall.liftedMessage || 'Removed the login wall. This story is free to read.';
+      const message = site.live.wall.liftedMessage || (site.isArticle(location.pathname)
+        ? 'Removed the login wall. This story is free to read.'
+        : `Removed ${site.shortName || site.name}'s wall.`);
       const say = () => {
         // The status bar keeps it short; the toolbar icon's tooltip has the whole message.
         announce(null, message.split(/(?<=\.) /)[0], 'lifted', { paid: wall !== 'login' });
@@ -253,7 +259,7 @@
     if (wall) render.showWall(document);
     if (manual) {
       statusBar.create(document).finish('info', wall
-        ? `Live blogs behind ${site.shortName}'s paywall aren't supported yet.`
+        ? `Pages like this one behind ${site.shortName || site.name}'s paywall aren't supported yet.`
         : 'There is no login wall or paywall on this page.');
     }
   }

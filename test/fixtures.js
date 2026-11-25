@@ -204,34 +204,69 @@ const SCRIM = '<div class="css-hgm7bf" style="position:absolute;pointer-events:n
 // leadFigure: a photo at the top of the article body, above the first paragraph.
 // upsell: NYT's subscription line under the cut-off text, 'inside' the article body or 'after' it.
 const UPSELL = '<p class="css-upsell"><a href="https://www.nytimes.com/subscription?campaignId=TEST">Subscribe</a> to keep reading this article.</p>';
-function livePageHtml({ paragraphs = 3, section = true, wall = 'paywall', leadFigure = false, upsell = null } = {}) {
+// marks: what a wall makes inert. 'main': main#site-content (until Nov 2026). 'parts': the article
+// body and several divs, one by one, and not main; the popup then holds only a note for screen
+// readers and an empty div (the user's Chrome, 2026-11-25).
+const PARTS = ['#story > header', 'section[name="articleBody"]', 'aside.related', '[data-testid="vi-gateway-container"] > .masthead-row'];
+const PARTS_TEXT = '<p id="gateway-exit-advisory">To leave without logging in or creating an account, use your browser\'s Back button.</p><div></div>';
+function livePageHtml({ paragraphs = 3, section = true, wall = 'paywall', leadFigure = false, upsell = null, marks = 'main' } = {}) {
   const ps = Array.from({ length: paragraphs }, (_, i) => `<p class="css-12m5bll evys1bk0">Live paragraph ${i + 1}. ${LOREM}</p>`).join('');
   const body = `
     ${leadFigure ? '<div class="css-79elbk"><figure><img src="https://static01.nyt.com/images/lead.jpg" alt=""><figcaption><p class="css-caption">A lead photo caption</p></figcaption></figure></div>' : ''}
     <div class="css-s99gbd StoryBodyCompanionColumn" data-testid="companionColumn-0"><div class="css-53u6y8">${ps}${upsell === 'inside' ? UPSELL : ''}</div></div>
     <div class="css-1u3p7j1"><figure><figcaption><p class="css-caption">A caption paragraph</p></figcaption></figure></div>`;
-  const blocked = wall ? ' inert aria-hidden="true"' : '';
+  const INERT = ' inert aria-hidden="true"';
+  const blocked = wall && marks === 'main' ? INERT : '';
+  const part = wall && marks === 'parts' ? INERT : '';
   return `<!doctype html><html><head></head><body><div id="app"><div>
   <div data-testid="vi-gateway-container" class="vi-gateway-container css-mcm29f">
-    <div><header class="masthead"><a href="/">The Masthead</a></header></div>
+    <div class="masthead-row"${part}><header class="masthead"><a href="/">The Masthead</a></header></div>
     <main id="site-content"${blocked}><div>
-      <article id="story"><header><h1>Headline</h1></header>
-        ${section ? `<section name="articleBody">${body}</section>` : ''}
+      <article id="story"><header${part}><h1>Headline</h1></header>
+        ${section ? `<section name="articleBody"${part}>${body}</section>` : ''}
         ${upsell === 'after' ? UPSELL : ''}
       </article>
-      <aside class="related"><a href="/2026/11/12/world/related.html">A related article</a></aside>
+      <aside class="related"${part}><a href="/2026/11/12/world/related.html">A related article</a></aside>
     </div></main>
-    <div style="display:contents"><div id="gateway-content" data-testid="gateway-content" class="css-1aa2f1p">${wall ? WALL_TEXT[wall] : ''}</div></div>
+    <div style="display:contents"><div id="gateway-content" data-testid="gateway-content" class="css-1aa2f1p">${wall ? (marks === 'parts' ? PARTS_TEXT : WALL_TEXT[wall]) : ''}</div></div>
     <div style="display:contents"></div>
     ${wall ? SCRIM : ''}
   </div>
 </div></div></body></html>`;
 }
 
+// An NYT interactive page (the user's Chrome, 2026-11-25): no article#story or articleBody, main
+// right under #app, and the wall's elements beside it. Under the login wall nothing is inert; main is
+// pinned by inline styles, so the document has no height to scroll. scrolled: how far the reader had
+// scrolled when it went up.
+const EXIT_NOTE = "To leave without logging in or creating an account, use your browser's Back button.";
+const PIN = scrolled => `position: fixed; width: 100%; margin-top: -${scrolled}px;`;
+function interactivePageHtml({ wall = 'login', scrolled = 0 } = {}) {
+  const ps = Array.from({ length: 40 }, (_, i) => `<p class="g-body">Interactive paragraph ${i + 1}. ${LOREM}</p>`).join('');
+  return `<!doctype html><html><head></head><body style="padding-top: 0px;"><div id="app">
+  <main id="site-content"${wall ? ` style="${PIN(scrolled)}"` : ''}><div>${ps}</div></main></div>
+  <div data-testid="vi-gateway-container"><div></div>
+    <div data-testid="onsite-messaging-unit-gateway"><div data-testid="gateway-backdrop" aria-hidden="true"></div>
+      <div id="gateway-content" data-testid="gateway-content">${wall ? `<p id="gateway-exit-advisory">${EXIT_NOTE}</p><div></div>` : ''}</div></div></div>
+</body></html>`;
+}
+// The wall on an interactive page built with wall: null.
+function pinInteractive(doc, { scrolled = 0 } = {}) {
+  doc.getElementById('gateway-content').innerHTML = `<p id="gateway-exit-advisory">${EXIT_NOTE}</p><div></div>`;
+  doc.getElementById('site-content').setAttribute('style', PIN(scrolled));
+}
+
 // Puts a wall up on a page built with wall: null, the way NYT does a moment after load.
-function raiseWall(doc, wall) {
-  doc.getElementById('gateway-content').innerHTML = WALL_TEXT[wall];
+function raiseWall(doc, wall, { marks = 'main' } = {}) {
+  doc.getElementById('gateway-content').innerHTML = marks === 'parts' ? PARTS_TEXT : WALL_TEXT[wall];
   doc.querySelector('[data-testid="vi-gateway-container"]').insertAdjacentHTML('beforeend', SCRIM);
+  if (marks === 'parts') {
+    for (const el of doc.querySelectorAll(PARTS.join(', '))) {
+      el.setAttribute('aria-hidden', 'true');
+      el.setAttribute('inert', '');
+    }
+    return;
+  }
   const main = doc.getElementById('site-content');
   main.setAttribute('aria-hidden', 'true');
   main.setAttribute('inert', '');
@@ -596,4 +631,4 @@ module.exports = {
   nineLivePageHtml, nineSnapshotHtml, wsjLivePageHtml, wsjSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, lemondeLivePageHtml, lemondeSnapshotHtml,
   nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml,
   reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml,
-  LOREM, parse, snapshotHtml, ftSnapshotHtml, ftLivePageHtml, livePageHtml, raiseWall, TIMEMAP, timemapFor, mementoUrl, memoryArea };
+  LOREM, parse, snapshotHtml, ftSnapshotHtml, ftLivePageHtml, livePageHtml, interactivePageHtml, pinInteractive, EXIT_NOTE, raiseWall, TIMEMAP, timemapFor, mementoUrl, memoryArea };
