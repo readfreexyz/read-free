@@ -249,6 +249,7 @@
     loading = false;
     stopWatching();
     stopMissed();
+    stopWaiting();
     stopNotices();
     stopKeeping();
     undoAll({ putBackPaywall: false });
@@ -390,6 +391,7 @@
   // The reader asked for the site's version: put everything back, and don't redo it on our own.
   function undo() {
     undoAll();
+    stopWaiting();
     stopKeeping();
     pageGuard('release');
     userRestored = true;
@@ -468,12 +470,14 @@
   // blocked: archive.today wants a CAPTCHA or is rate-limiting, so asking it another way won't help.
   // unreachable: no answer at all from that address (background.js), so another one may do.
   // timedOut: no whole answer in the time it was given.
+  // check: the archive.today page that wants a CAPTCHA.
   class FixError extends Error {
-    constructor(message, { blocked = false, unreachable = false, timedOut = false } = {}) {
+    constructor(message, { blocked = false, unreachable = false, timedOut = false, check = null } = {}) {
       super(message);
       this.blocked = blocked;
       this.unreachable = unreachable;
       this.timedOut = timedOut;
+      this.check = check;
     }
   }
   const noAnswer = hosts => `Couldn't connect to ${hosts.length > 1 ? `archive.today: neither ${hosts.join(' nor ')} answered` : hosts[0]}. It may be down for a moment, or your network may be blocking it. Wait a minute and try again.`;
@@ -487,6 +491,45 @@
     run({ force: true });
   }
   const tryAgain = { text: 'Try again', onClick: retry };
+
+  // archive.today wants a CAPTCHA, which is the reader's to complete: in a tab, on the page that
+  // asked. Its cookie then goes with Read Free's own requests, so when they come back the article is
+  // asked for again, once. A check completed from another article's page counts too: this one sees
+  // that when the reader gets to it (nytfix:check).
+  let stopWaiting = () => {};
+  function waitForCheck(check) {
+    stopWaiting();
+    const gen = generation;
+    let opened = false;
+    let asking = false;
+    const back = async () => {
+      if (asking || document.visibilityState === 'hidden') return;
+      asking = true;
+      // Not opened from here: has it been completed elsewhere?
+      const done = opened || (await chrome.runtime.sendMessage({ type: 'nytfix:check', host: new URL(check).hostname }).catch(() => true)) === false;
+      asking = false;
+      if (!done || gen !== generation || loading || applied() && undoSwap) return;
+      stopWaiting();
+      retry();
+    };
+    const events = [[document, 'visibilitychange'], [window, 'focus']];
+    for (const [target, name] of events) target.addEventListener(name, back);
+    stopWaiting = () => {
+      for (const [target, name] of events) target.removeEventListener(name, back);
+      stopWaiting = () => {};
+    };
+    return {
+      text: 'Complete the check',
+      onClick: () => {
+        opened = true;
+        window.open(check, '_blank', 'noopener');
+      },
+    };
+  }
+  // The background lets the tab being read go first
+  document.addEventListener('visibilitychange', () => {
+    if (loading) chrome.runtime.sendMessage({ type: 'nytfix:looking', visible: document.visibilityState !== 'hidden' }).catch(() => {});
+  });
   const warnCache = e => console.warn('[Read Free] cache error', e);
 
   // Content scripts can't fetch archive.today cross-origin, so the service worker does it.
@@ -497,11 +540,12 @@
   // ("Extension context invalidated") can't be helped by asking again: the page needs a reload.
   const BACKGROUND_WENT_AWAY = /message channel (is )?closed|receiving end does not exist|message port closed/i;
   const BACKGROUND_RETRY_MS = 500;
-  async function bgFetch(url, timeoutMs) {
+  // force: the reader asked (Try again, or back from a check), so ask even while a check is waiting.
+  async function bgFetch(url, timeoutMs, { force = false } = {}) {
     let res;
     for (let attempt = 1; ; attempt++) {
       try {
-        res = await chrome.runtime.sendMessage({ type: 'nytfix:fetch', url, timeoutMs });
+        res = await chrome.runtime.sendMessage({ type: 'nytfix:fetch', url, timeoutMs, force, visible: document.visibilityState !== 'hidden' });
       } catch (e) {
         if (attempt > 1 || !BACKGROUND_WENT_AWAY.test(e.message)) {
           throw new FixError(`The extension's background worker didn't answer (${e.message}). Reload the page and try again.`);
@@ -513,16 +557,16 @@
     }
     if (!res) throw new FixError("The extension's background worker didn't answer. Reload the page and try again.");
     const host = new URL(url).hostname;
+    const wantsCheck = check => new FixError(`${host} wants a CAPTCHA before it sends the article. Complete the check, then come back: Read Free tries again by itself.`, { blocked: true, check: archive.isArchiveUrl(check) ? check : url });
     if (!res.ok) {
+      if (res.reason === 'check') throw wantsCheck(res.check);
       if (res.reason) console.info(`[Read Free] ${host}: ${res.error} (${res.reason})`);
       if (res.reason === 'unreachable') throw new FixError(noAnswer([host]), { unreachable: true });
       if (res.reason === 'cut-off') throw new FixError(`The connection to ${host} broke off before the page had arrived. Try again.`);
       throw new FixError(`Couldn't reach ${host}: ${res.error}.`, { timedOut: !res.reason });
     }
     const blocked = archive.looksBlocked(res.status, res.body);
-    if (blocked === 'captcha') {
-      throw new FixError(`${host} wants a CAPTCHA. Open it, complete the check, then click the toolbar button again.`, { blocked: true });
-    }
+    if (blocked === 'captcha') throw wantsCheck(res.url); // the page that asked: often the snapshot, not the lookup
     if (blocked === 'rate-limited') throw new FixError(`${host} is rate-limiting requests. Wait a minute and try again.`, { blocked: true });
     return res;
   }
@@ -533,6 +577,7 @@
   // force: skip the remembered "no snapshot yet" answer (toolbar click, "Check again").
   async function run({ force = false } = {}) {
     loading = true;
+    stopWaiting();
     const gen = generation;
     const stale = () => gen !== generation;
     const articleUrl = site.normalizeUrl(location.href);
@@ -573,7 +618,7 @@
       const startedAt = Date.now();
       const ask = async (stage, addressOf, timeoutMs) => {
         try {
-          return await bgFetch(addressOf(mirror), timeoutMs);
+          return await bgFetch(addressOf(mirror), timeoutMs, { force });
         } catch (e) {
           // With neither address answering, a list that times out is one more not answering.
           if (e.timedOut && unanswered.length > 1) throw new FixError(noAnswer(unanswered), { unreachable: true });
@@ -585,7 +630,7 @@
           console.info(`[Read Free] trying ${mirror} instead`);
           status.stage(stage, `${first} didn't answer. Trying ${mirror}…`, stage === 'find' ? FIND_STAGE : DOWNLOAD_STAGE);
           try {
-            return await bgFetch(addressOf(mirror), timeoutMs);
+            return await bgFetch(addressOf(mirror), timeoutMs, { force });
           } catch (again) {
             if (!again.unreachable) throw again;
             unanswered.push(mirror);
@@ -713,14 +758,15 @@
       if (e instanceof FixError) console.info('[Read Free]', e.message);
       else console.warn('[Read Free]', e);
       const message = e instanceof FixError ? e.message : `Something went wrong: ${e.message}`;
+      const check = e instanceof FixError && e.check ? waitForCheck(e.check) : null;
       status.finish('error', message);
-      placeholder?.finish('error', `Couldn't load the rest of this article. ${message}`, { action: tryAgain });
+      placeholder?.finish('error', `Couldn't load the rest of this article. ${message}`, { action: check || tryAgain });
       showWallIfNothingToRead(paywalled);
       render.showBanner(document, site, {
         kind: 'error',
         message,
-        links: [{ text: 'Open on archive.today', href: archive.searchUrl(articleUrl, mirror) }, reportLink(message)],
-        actions: [tryAgain, dismiss],
+        links: check ? [reportLink(message)] : [{ text: 'Open on archive.today', href: archive.searchUrl(articleUrl, mirror) }, reportLink(message)],
+        actions: check ? [check, tryAgain, dismiss] : [tryAgain, dismiss],
       });
     } finally {
       if (!stale()) {

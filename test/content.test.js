@@ -75,7 +75,7 @@ async function waitFor(check, timeout = 3000) {
 // page/piano-adblock.js pins for La Libre's ad-blocker check
 const MEANT_GLOBALS = new Set(['NYTFix', '__nytfixLoaded', 'setNptTechAdblockerCookie', 'blockAdBlock']);
 
-function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = memoryArea(), sync = memoryArea(), scripts = scriptsFor(url), newer = null } = {}) {
+function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = memoryArea(), sync = memoryArea(), scripts = scriptsFor(url), newer = null, checkWanted = () => false } = {}) {
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', e => { if (!/Not implemented: (window\.scroll|Window's scroll)/.test(e.message)) console.error(e); });
   const logs = [];
@@ -84,6 +84,14 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
   const doc = window.document;
 
   const fetched = [];
+  const forced = [];     // was each asked for by the reader?
+  const checksAsked = []; // 'nytfix:check': is a CAPTCHA still waiting?
+  const looking = [];
+  const opened = [];     // window.open
+  window.open = (...args) => { opened.push(args); return null; };
+  let hidden = false;
+  Object.defineProperty(doc, 'visibilityState', { configurable: true, get: () => (hidden ? 'hidden' : 'visible') });
+  const visibility = state => { hidden = state === 'hidden'; doc.dispatchEvent(new window.Event('visibilitychange')); };
   const marks = []; // the toolbar mark's states, in order (null: cleared)
   const listeners = [];
   window.chrome = {
@@ -95,7 +103,10 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
           return undefined;
         }
         if (msg.type === 'nytfix:newer') return typeof newer === 'function' ? newer() : newer;
+        if (msg.type === 'nytfix:check') { checksAsked.push(msg.host); return checkWanted(); }
+        if (msg.type === 'nytfix:looking') { looking.push(msg.visible); return undefined; }
         fetched.push(msg.url);
+        forced.push(msg.force);
         return answer(msg.url);
       },
     },
@@ -125,7 +136,7 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
   const leaked = () => Object.getOwnPropertyNames(window).filter(name => !before.has(name) && !MEANT_GLOBALS.has(name) && !/^\d+$/.test(name));
 
   return {
-    window, doc, fetched, marks, storage, logs,
+    window, doc, fetched, forced, checksAsked, looking, opened, visibility, marks, storage, logs,
     mark: () => marks[marks.length - 1] ?? null,
     toggle: () => new Promise(resolve => listeners[0]({ type: 'nytfix:toggle' }, {}, resolve)),
     details: () => new Promise(resolve => listeners[0]({ type: 'nytfix:details' }, {}, resolve)),
@@ -658,7 +669,8 @@ test('the other address wants a CAPTCHA: it says which, links there, and asks no
   try {
     await waitFor(() => page.banner()?.dataset.kind === 'error');
     assert.match(page.banner().textContent, /archive\.is wants a CAPTCHA/);
-    assert.equal(page.banner().querySelector('a').href, archive.searchUrl(ARTICLE, 'archive.is'));
+    page.button('Complete the check').click();
+    assert.equal(page.opened[0][0], newestUrl(ARTICLE, 'archive.is'));
     assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is')]);
   } finally {
     page.close();
@@ -2293,6 +2305,111 @@ test('a page that scrolls inside an element of its own is not frozen', async () 
     await sleep(250);
     assert.equal(page.mark(), 'lifted');
     assert.equal((await page.state()).missed, undefined);
+  } finally {
+    page.close();
+  }
+});
+
+// archive.today's CAPTCHA: the reader's to complete, on the page that asked for it
+const CHECK_PAGE = { ok: true, status: 200, url: snapshotUrl(T[3]), body: '<div class="g-recaptcha"></div>' };
+const inNote = (page, label) => [...page.doc.querySelectorAll('.nytfix-loading button')].find(b => b.textContent === label);
+
+test('a CAPTCHA on the snapshot: the button opens that page, not the lookup; nothing says to use the toolbar', async () => {
+  const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE } });
+  try {
+    await waitFor(() => page.banner()?.dataset.kind === 'error');
+    assert.match(page.banner().textContent, /wants a CAPTCHA before it sends the article\. Complete the check, then come back/);
+    assert.doesNotMatch(page.doc.body.textContent, /toolbar button/);
+    for (const button of [page.button('Complete the check'), inNote(page, 'Complete the check')]) button.click();
+    assert.deepEqual(page.opened, [[snapshotUrl(T[3]), '_blank', 'noopener'], [snapshotUrl(T[3]), '_blank', 'noopener']]);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+    assert.deepEqual(page.forced, [false]);
+  } finally {
+    page.close();
+  }
+});
+
+test('back from the check: the article is asked for once more, and goes in', async () => {
+  let asked = 0;
+  const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: () => (++asked === 1 ? CHECK_PAGE : { ...ok(COMPLETE), url: snapshotUrl(T[3]) }) } });
+  try {
+    (await waitFor(() => page.button('Complete the check'))).click();
+    page.visibility('hidden');
+    await sleep(30);
+    assert.equal(asked, 1, 'not while away');
+    page.visibility('visible');
+    page.window.dispatchEvent(new page.window.Event('focus')); // both come, as in a browser
+    await waitFor(page.body);
+    assert.equal(asked, 2);
+    assert.deepEqual(page.forced, [false, true]);
+    assert.deepEqual(page.checksAsked, [], 'they went to it from here');
+  } finally {
+    page.close();
+  }
+});
+
+test("back without completing it: asked once, told again; looking away and back doesn't ask any more", async () => {
+  const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE }, checkWanted: () => true });
+  try {
+    (await waitFor(() => page.button('Complete the check'))).click();
+    page.visibility('hidden');
+    page.visibility('visible');
+    await waitFor(() => page.fetched.length === 2 && page.button('Complete the check'));
+    for (let i = 0; i < 3; i++) { page.visibility('hidden'); page.visibility('visible'); await sleep(20); }
+    assert.equal(page.fetched.length, 2);
+    assert.ok(page.checksAsked.length >= 1 && page.checksAsked.every(h => h === 'archive.ph'));
+  } finally {
+    page.close();
+  }
+});
+
+test('a check another page is waiting for: nothing is asked, and once it is completed elsewhere, this one carries on', async () => {
+  let wanted = true;
+  const waiting = { ok: false, error: 'a check is waiting', reason: 'check', check: snapshotUrl(T[2], OTHER) };
+  const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: () => (wanted ? waiting : { ...ok(COMPLETE), url: snapshotUrl(T[3]) }) }, checkWanted: () => wanted });
+  try {
+    await waitFor(() => page.button('Complete the check'));
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE)], 'no list, no other address');
+    page.visibility('hidden');
+    page.visibility('visible');
+    await sleep(40);
+    assert.equal(page.fetched.length, 1, 'still waiting');
+    wanted = false;
+    page.visibility('hidden');
+    page.visibility('visible');
+    await waitFor(page.body);
+    assert.deepEqual(page.opened, []);
+  } finally {
+    page.close();
+  }
+});
+
+test("another article in the page, or the reader's own undo: coming back asks for nothing", async () => {
+  const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE } });
+  try {
+    (await waitFor(() => page.button('Complete the check'))).click();
+    await page.toggle(); // NYT's version
+    page.visibility('hidden');
+    page.visibility('visible');
+    await sleep(60);
+    assert.deepEqual(page.fetched, [newestUrl(ARTICLE)]);
+  } finally {
+    page.close();
+  }
+});
+
+test('a page that is loading says whether the reader is looking at it', async () => {
+  let go;
+  const page = boot({ responses: { [newestUrl(ARTICLE)]: () => new Promise(r => { go = r; }) } });
+  try {
+    await waitFor(() => go);
+    page.visibility('hidden');
+    page.visibility('visible');
+    assert.deepEqual(page.looking, [false, true]);
+    go({ ...ok(COMPLETE), url: snapshotUrl(T[3]) });
+    await waitFor(page.body);
+    page.visibility('hidden');
+    assert.equal(page.looking.length, 2, 'only while loading');
   } finally {
     page.close();
   }

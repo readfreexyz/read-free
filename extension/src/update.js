@@ -81,7 +81,12 @@
     let fetchesUntil = 0;
     function noteMessage(msg, sender) {
       if (sender?.id !== chrome.runtime.id || msg?.type !== 'nytfix:fetch') return;
-      const timeoutMs = Number(msg.timeoutMs) > 0 ? Number(msg.timeoutMs) : 20000;
+      noteFetch(msg.timeoutMs);
+    }
+
+    // A download started (or was asked for): it has this long.
+    function noteFetch(ms) {
+      const timeoutMs = Number(ms) > 0 ? Number(ms) : 20000;
       fetchesUntil = Math.max(fetchesUntil, now() + timeoutMs + FETCH_MARGIN_MS);
     }
 
@@ -167,7 +172,7 @@
         .catch(ignore);
     }
 
-    return { tick, start, noteMessage, missingFiles };
+    return { tick, start, noteMessage, noteFetch, missingFiles };
   }
 
   const api = { ALARM, PERIOD_MINUTES, MAX_WAIT_MS, compareVersions, isNewer, manifestFiles, importedScripts, createUpdater };
@@ -177,6 +182,8 @@
 
   // In the service worker (background.js imports this file), start checking.
   if (typeof ServiceWorkerGlobalScope !== 'undefined' && root instanceof ServiceWorkerGlobalScope && root.chrome?.alarms) {
-    createUpdater({ chrome: root.chrome, fetch: root.fetch.bind(root) }).start();
+    const updater = createUpdater({ chrome: root.chrome, fetch: root.fetch.bind(root) });
+    api.noteFetch = updater.noteFetch;
+    updater.start();
   }
 })(globalThis);

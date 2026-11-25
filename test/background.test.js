@@ -15,14 +15,14 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 // page with no importScripts, given the same files first (tools/firefox.mjs), and a manifest with
 // Mozilla's settings. permissions: chrome.permissions, for Firefox (src/access.js). speed: its
 // timers run this much faster.
-function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); }, speed = 1, firefox = false, permissions = null } = {}) {
+function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0', fetch = async () => { throw new Error('offline'); }, speed = 1, session = null, firefox = false, permissions = null } = {}) {
   const calls = [];
-  const listeners = { message: [], changed: [], alarm: [], installed: [] };
+  const listeners = { message: [], changed: [], alarm: [], installed: [], removed: [] };
   const alarms = {};
   const record = name => async details => { calls.push([name, details]); };
   const chrome = {
     runtime: { id: 'nytfix', onMessage: { addListener: fn => listeners.message.push(fn) }, onStartup: { addListener: () => {} }, getPlatformInfo: async () => ({}), getURL: p => `chrome-extension://nytfix/${p}`, getManifest: () => ({ version, host_permissions: ['https://archive.ph/*'], content_scripts: [{ matches: ['https://www.nytimes.com/*', 'https://cooking.nytimes.com/*'] }], ...(firefox ? { browser_specific_settings: { gecko: { id: 'read-free@readfree.xyz' } } } : {}) }), onInstalled: { addListener: fn => listeners.installed.push(fn) } },
-    storage: { sync, local, onChanged: { addListener: fn => listeners.changed.push(fn) } },
+    storage: { sync, local, ...(session ? { session } : {}), onChanged: { addListener: fn => listeners.changed.push(fn) } },
     alarms: {
       get: async name => alarms[name],
       create: async (name, info) => { alarms[name] = { name, ...info }; },
@@ -35,7 +35,7 @@ function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0',
       setTitle: record('title'),
       setIcon: record('icon'),
     },
-    tabs: { sendMessage: async () => ({}), create: record('tab') },
+    tabs: { sendMessage: async () => ({}), create: record('tab'), onRemoved: { addListener: fn => listeners.removed.push(fn) } },
     ...(permissions ? { permissions } : {}),
   };
   const context = vm.createContext({ chrome, console, setTimeout: (fn, ms) => setTimeout(fn, ms / speed), clearTimeout, setInterval, clearInterval, URL, AbortController, fetch });
@@ -52,10 +52,11 @@ function worker({ sync = memoryArea(), local = memoryArea(), version = '0.21.0',
   const changeSettings = value => { for (const fn of listeners.changed) fn({ settings: { newValue: value } }, 'sync'); };
   const changeLocal = (key, value) => { for (const fn of listeners.changed) fn({ [key]: { newValue: value } }, 'local'); };
   const fireAlarm = name => { for (const fn of listeners.alarm) fn({ name }); };
+  const closeTab = tabId => { for (const fn of listeners.removed) fn(tabId); };
   const installed = reason => { for (const fn of listeners.installed) fn({ reason }); };
   // Plain copies: objects made inside the vm context have their own prototypes.
   const last = name => { const found = calls.filter(([n]) => n === name).pop()?.[1]; return found && JSON.parse(JSON.stringify(found)); };
-  return { calls, send, last, changeSettings, changeLocal, fireAlarm, installed, alarms };
+  return { calls, send, last, changeSettings, changeLocal, fireAlarm, installed, closeTab, alarms, context };
 }
 
 test("toolbar mark: a green check on the tab's icon while the wall is off, cleared on request", async () => {
@@ -346,4 +347,147 @@ test('no answer for long: an address whose icon comes is only slow; one that say
   const chrome = await run(never, never, 90000, false);
   assert.deepEqual(chrome.reply, { ok: false, error: 'timed out after 90 s' }, 'Chrome: not asked, since fetch() says so itself');
   assert.equal(chrome.icons, 0);
+});
+
+// Requests to archive.today: one at a time, a second apart (here 1000 times faster), the tab being
+// read first; after a CAPTCHA, none until it's completed or the reader asks.
+const CAPTCHA = '<div class="g-recaptcha"></div>';
+function archiveWorker({ session = memoryArea(), answer = async () => 'text', status = () => 200, speed = 100 } = {}) {
+  const asked = [];
+  const open = new Map(); // url -> answer it
+  let most = 0;
+  const fetch = async url => {
+    const name = url.replace('https://archive.ph/newest/', '');
+    asked.push(name);
+    let done;
+    const answered = new Promise(r => { done = r; });
+    open.set(name, body => { open.delete(name); done(body); });
+    most = Math.max(most, open.size);
+    const auto = await answer(name);
+    if (auto !== undefined) open.get(name)(auto);
+    const body = await answered;
+    if (body instanceof Error) throw body;
+    return { status: status(name), url: body === CAPTCHA ? `https://archive.ph/20261114130000/${name}` : url, text: async () => body };
+  };
+  const w = worker({ fetch, speed, session });
+  const replies = {};
+  const ask = (name, tabId, { visible = true, force = false } = {}) => {
+    w.send({ type: 'nytfix:fetch', url: `https://archive.ph/newest/${name}`, timeoutMs: 90000, visible, force }, { id: 'nytfix', tab: { id: tabId } }, r => { replies[name] = JSON.parse(JSON.stringify(r)); });
+  };
+  const wanted = () => new Promise(resolve => w.send({ type: 'nytfix:check', host: 'archive.ph' }, { id: 'nytfix', tab: { id: 1 } }, resolve));
+  // Every request answered: one left hanging keeps its timers, and the test run, going
+  const finish = async () => {
+    for (let i = 0; i < 20; i++) {
+      for (const done of [...open.values()]) done('text');
+      await pause(10);
+    }
+  };
+  return { w, asked, open, replies, ask, wanted, finish, most: () => most };
+}
+const pause = ms => new Promise(r => setTimeout(r, ms));
+
+test('archive.today is asked one thing at a time, a second apart', async () => {
+  const a = archiveWorker({ answer: async () => undefined, speed: 20 }); // a gap of 50 ms
+  for (const [i, name] of ['one', 'two', 'three'].entries()) a.ask(name, i + 1, { visible: false });
+  await pause(20);
+  assert.deepEqual(a.asked, ['one']);
+  await pause(150);
+  assert.deepEqual(a.asked, ['one'], 'the first is still on its way');
+  a.open.get('one')('text');
+  await pause(20);
+  assert.deepEqual(a.asked, ['one', 'two'], 'the gap was over long ago');
+  a.open.get('two')('text');
+  await pause(15);
+  assert.deepEqual(a.asked, ['one', 'two'], 'not before the gap is');
+  await pause(80);
+  assert.deepEqual(a.asked, ['one', 'two', 'three']);
+  a.open.get('three')('text');
+  await pause(20);
+  assert.equal(a.most(), 1);
+  assert.deepEqual(Object.values(a.replies).map(r => r.ok), [true, true, true]);
+  await a.finish();
+});
+
+test('the tab being read goes first, and need not wait for another; never more than two at once', async () => {
+  const a = archiveWorker({ answer: async () => undefined });
+  a.ask('hidden1', 1, { visible: false });
+  await pause(30);
+  a.ask('hidden2', 2, { visible: false });
+  a.ask('shown', 3);
+  await pause(40);
+  assert.deepEqual(a.asked, ['hidden1', 'shown']);
+  a.ask('shown2', 4);
+  await pause(60);
+  assert.deepEqual(a.asked, ['hidden1', 'shown'], 'two on their way');
+  a.open.get('hidden1')('text');
+  await pause(40);
+  assert.deepEqual(a.asked, ['hidden1', 'shown', 'shown2']);
+  a.w.send({ type: 'nytfix:looking', visible: true }, { id: 'nytfix', tab: { id: 2 } });
+  a.open.get('shown')('text');
+  await pause(40);
+  assert.deepEqual(a.asked, ['hidden1', 'shown', 'shown2', 'hidden2'], 'the reader got to that tab');
+  assert.equal(a.most(), 2);
+  await a.finish();
+});
+
+test("a closed tab's request is dropped", async () => {
+  const a = archiveWorker({ answer: async () => undefined });
+  a.ask('one', 1, { visible: false });
+  a.ask('two', 2, { visible: false });
+  a.ask('three', 3, { visible: false });
+  await pause(20);
+  a.w.closeTab(2);
+  a.open.get('one')('text');
+  await pause(40);
+  a.open.get('three')('text');
+  await pause(40);
+  assert.deepEqual(a.asked, ['one', 'three']);
+  await a.finish();
+});
+
+test('after a CAPTCHA nothing more is asked, by any page, until the reader asks; getting past it lets the rest through', async () => {
+  const session = memoryArea();
+  const a = archiveWorker({ session, answer: async name => (name === 'first' || name === 'early' ? CAPTCHA : 'text') });
+  a.ask('first', 1);
+  a.ask('second', 2, { visible: false });
+  await pause(60);
+  assert.deepEqual(a.asked, ['first']);
+  assert.equal(a.replies.first.ok, true, 'the page sees the CAPTCHA itself');
+  assert.deepEqual(a.replies.second, { ok: false, error: 'a check is waiting', reason: 'check', check: 'https://archive.ph/20261114130000/first' });
+  assert.equal(await a.wanted(), true);
+
+  const again = archiveWorker({ session, answer: async name => (name === 'early' ? CAPTCHA : 'text') }); // the worker restarted
+  again.ask('third', 3);
+  await pause(40);
+  assert.deepEqual(again.asked, [], 'remembered');
+  again.ask('early', 4, { force: true });
+  await pause(40);
+  assert.deepEqual(again.asked, ['early']);
+  assert.equal(await again.wanted(), true, 'not completed yet');
+  again.ask('done', 5, { force: true });
+  await pause(40);
+  assert.equal(await again.wanted(), false);
+  again.ask('fourth', 6);
+  await pause(60);
+  assert.deepEqual(again.asked, ['early', 'done', 'fourth']);
+  assert.equal(again.replies.fourth.ok, true);
+});
+
+test('a check is forgotten after ten minutes; another address has none; a failure neither sets nor clears one', async () => {
+  const session = memoryArea();
+  const a = archiveWorker({ session, answer: async name => (name === 'first' ? CAPTCHA : name === 'broken' ? new TypeError('Failed to fetch') : 'text') });
+  a.ask('first', 1);
+  await pause(40);
+  a.ask('broken', 1, { force: true });
+  await pause(40);
+  assert.equal(await a.wanted(), true);
+  const other = await new Promise(r => a.w.send({ type: 'nytfix:check', host: 'archive.is' }, { id: 'nytfix', tab: { id: 1 } }, r));
+  assert.equal(other, false);
+  const down = archiveWorker({ session, status: () => 503 });
+  down.ask('down', 1, { force: true });
+  await pause(40);
+  assert.equal(await down.wanted(), true, 'a server error is no answer');
+  session.data['nytfix:checks']['archive.ph'].at -= 10 * 60 * 1000 + 1;
+  const later = archiveWorker({ session });
+  assert.equal(await later.wanted(), false);
 });

@@ -129,6 +129,9 @@ incognito window with extensions off.
   the window and can't scroll. The note reads "To leave without logging in or creating an account, use your browser's
   Back button" (it used to say "signing in"). All the text was there (221 `<p>`). Read Free ignored `/interactive/`
   while its CSS hid the wall, which left the page frozen at the top.
+- **The page's own data doesn't hold the rest (2026-11-25, the user's Chrome, a cut article):** `window.__preloadedData`
+  had 9 `ParagraphBlock`s, 1,630 characters of text: about what a cut page shows. So the archive is still needed.
+  (Counting the word "ParagraphBlock" there finds more: type lists hold it too.)
 - **CSP is permissive:** `img-src data: https: blob:`, `style-src 'unsafe-inline' https:`,
   no Trusted Types. Injected markup and either image source (archive or static01) will load.
 - **NYT uses DataDome:** a cookieless fetch of the article gets a 403 bot challenge. The extension

@@ -146,6 +146,19 @@ test('an archive.today download in flight holds the reload until its timeout has
   assert.equal(await ext.tick(), 'reloaded');
 });
 
+test('a download that waited its turn is counted from when it starts', async () => {
+  const ext = extension({ running: '1.0.0' });
+  ext.publish('1.0.1');
+  await ext.tick();
+  ext.updater.noteMessage({ type: 'nytfix:fetch', timeoutMs: 20000 }, { id: 'nytfix', tab: { id: 3 } });
+  ext.wait(24000);
+  ext.updater.noteFetch(20000);
+  ext.wait(20000);
+  assert.equal(await ext.tick(), 'busy');
+  ext.wait(5000);
+  assert.equal(await ext.tick(), 'reloaded');
+});
+
 test("another extension's messages don't hold it", async () => {
   const ext = extension({ running: '1.0.0' });
   ext.publish('1.0.1');

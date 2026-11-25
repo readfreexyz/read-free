@@ -129,10 +129,89 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     release.load(chrome.storage.local).then(record => sendResponse(release.notice(record, running)), () => sendResponse(null));
     return true;
   }
+  // A page waiting for a check the reader hasn't completed asks whether it's still wanted
+  if (msg?.type === 'nytfix:check') {
+    checkWanted(msg.host).then(check => sendResponse(Boolean(check)));
+    return true;
+  }
+  // The reader is looking at that tab now (or isn't): its request goes first
+  if (msg?.type === 'nytfix:looking') {
+    for (const job of queue) if (job.tabId === sender.tab?.id) job.visible = Boolean(msg.visible);
+    pump();
+    return false;
+  }
   if (msg?.type !== 'nytfix:fetch') return false;
-  fetchArchive(msg.url, msg.timeoutMs).then(sendResponse);
+  queue.push({ url: msg.url, timeoutMs: msg.timeoutMs, force: Boolean(msg.force), visible: msg.visible !== false, tabId: sender.tab?.id, reply: sendResponse });
+  pump();
   return true; // respond asynchronously
 });
+chrome.tabs.onRemoved?.addListener(tabId => {
+  for (let i = queue.length - 1; i >= 0; i--) if (queue[i].tabId === tabId) queue.splice(i, 1);
+});
+
+// Requests to archive.today go one at a time, GAP_MS apart, so a handful of articles opened at once
+// isn't a handful of requests at once, which may be what brings on its CAPTCHA. The tab the reader is
+// looking at goes first, and needn't wait for one already on its way for another tab.
+const GAP_MS = 1000;
+const queue = []; // { url, timeoutMs, force, visible, tabId, reply }
+let inFlight = 0;
+let gapOver = true;
+// Read once, so that choosing what goes next has no waiting in it: a request that came in meanwhile
+// would be passed over.
+const pump = () => { loadChecks().then(pumpNow, ignore); };
+function pumpNow() {
+  while (queue.length) {
+    const next = queue.find(job => job.visible) || queue[0];
+    // After a CAPTCHA nothing more is asked until the reader has completed it, or asks (force)
+    const check = next.force ? null : pendingCheck(hostOf(next.url));
+    if (check) {
+      queue.splice(queue.indexOf(next), 1);
+      next.reply({ ok: false, error: 'a check is waiting', reason: 'check', check: check.url });
+      continue;
+    }
+    if (!gapOver || inFlight >= (next.visible ? 2 : 1)) return; // pumped again when that changes
+    queue.splice(queue.indexOf(next), 1);
+    start(next);
+  }
+}
+function start(job) {
+  inFlight++;
+  gapOver = false;
+  setTimeout(() => { gapOver = true; pump(); }, GAP_MS);
+  // It may have waited: the time update.js allows for a download counts from here
+  self.NYTFix.update?.noteFetch?.(job.timeoutMs);
+  fetchArchive(job.url, job.timeoutMs).then(async reply => {
+    await noteCheck(hostOf(job.url), reply).catch(ignore);
+    inFlight--;
+    try { job.reply(reply); } catch { /* the page went away */ }
+    pump();
+  });
+}
+
+// A CAPTCHA archive.today asked for, by address, until a request gets past it or CHECK_MS is up:
+// { [host]: { url, at } }. Kept for the browser session, as this worker comes and goes.
+const CHECK_MS = 10 * 60 * 1000;
+const CHECKS_KEY = 'nytfix:checks';
+let checks = null;
+let loadingChecks = null; // once: a second read could overwrite a check noted meanwhile
+const hostOf = url => { try { return new URL(url).hostname; } catch { return ''; } };
+function loadChecks() {
+  loadingChecks ??= Promise.resolve(chrome.storage.session?.get(CHECKS_KEY)).catch(ignore).then(saved => (checks = saved?.[CHECKS_KEY] || {}));
+  return loadingChecks;
+}
+function pendingCheck(host) {
+  const check = checks?.[host];
+  return check && Date.now() - check.at < CHECK_MS ? check : null;
+}
+const checkWanted = host => loadChecks().then(() => pendingCheck(host));
+async function noteCheck(host, reply) {
+  if (!reply.ok) return;
+  const all = await loadChecks();
+  if (archive.looksBlocked(reply.status, reply.body) === 'captcha') all[host] = { url: archive.isArchiveUrl(reply.url) ? reply.url : `https://${host}/`, at: Date.now() };
+  else if (all[host] && reply.status < 500 && reply.status !== 429) delete all[host]; // a real answer
+  else return;
+  await chrome.storage.session?.set({ [CHECKS_KEY]: all }).catch(ignore);
+}
 
 // state: 'lifted' (the text was on the page) or 'swapped' (archived text), 'off' (the reader
 // turned the extension off on this site), or null to clear the badge.

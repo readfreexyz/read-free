@@ -88,3 +88,21 @@ test('secondMirror: another permitted address, never one that only redirects to 
   const manifest = require('../extension/manifest.json');
   for (const mirror of MIRRORS) assert.ok(manifest.host_permissions.includes(`https://${secondMirror(mirror)}/*`), mirror);
 });
+
+// A CAPTCHA stops every article until it's completed, so the word alone isn't one: an article's own
+// address or title can hold it.
+test('looksBlocked: a CAPTCHA page, not a page that mentions one', () => {
+  const { looksBlocked } = archive;
+  for (const page of [
+    '<html><form><div class="g-recaptcha" data-sitekey="x"></div></form></html>',
+    '<html><script src="https://www.google.com/recaptcha/api.js"></script><script>function sendCaptcha(t) {}</script></html>',
+    '<html><div id="h-captcha"></div></html>',
+    '<html><script src="/cdn-cgi/challenge-platform/h/b/orchestrate.js"></script></html>',
+  ]) assert.equal(looksBlocked(200, page), 'captcha', page);
+  for (const page of [
+    '<https://archive.ph/timegate/https://www.example.com/2026/11/why-captcha-is-dying.html>; rel="timegate",\n<http://archive.md/20261114050535/https://www.example.com/2026/11/why-captcha-is-dying.html>; rel="first memento"; datetime="Sat, 14 Nov 2026 05:05:35 GMT"',
+    '<html><input name="q" value="https://www.example.com/why-captcha-is-dying.html"><a href="https://www.example.com/why-captcha-is-dying.html">No results</a></html>',
+    '<html><h1>The CAPTCHA is dying</h1><p>Every captcha you solve, reCAPTCHA or hCaptcha…</p></html>',
+  ]) assert.equal(looksBlocked(200, page), null, page);
+  assert.equal(looksBlocked(429, ''), 'rate-limited');
+});

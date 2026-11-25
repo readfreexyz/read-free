@@ -77,10 +77,12 @@
     }
   }
 
-  // archive.today's CAPTCHA and rate-limit pages are small; real snapshots are megabytes.
+  // archive.today's CAPTCHA and rate-limit pages are small; real snapshots are megabytes. The word
+  // alone doesn't make one (an article's address or title can hold it): its parts do.
+  const CAPTCHA_PARTS = /<[^>]+\s(?:class|id)=["']?[^"'>]*captcha|<(?:script|iframe)[^>]*\ssrc=["']?[^"'>]*(?:captcha|cf-chl|challenge-platform)|\bsendCaptcha\b|\bcf-chl-/i;
   function looksBlocked(status, body) {
     if (status === 429) return 'rate-limited';
-    if (body && body.length < 200000 && /captcha|g-recaptcha|h-captcha|cf-chl|challenge-platform/i.test(body)) {
+    if (body && body.length < 200000 && CAPTCHA_PARTS.test(body)) {
       return 'captcha';
     }
     return null;

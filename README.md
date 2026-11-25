@@ -215,11 +215,15 @@ otherwise stops extension storage at 10 MB).
 - **Moving between articles:** if NYT shows another article without a full page load, the
   extension starts over for that article.
 - **Problems:** a CAPTCHA, a timeout or a network error shows a red banner with a link to the
-  article on archive.today and a **Try again** button (also on the note in the article). If
-  there's a CAPTCHA, complete it there first. **Report a problem** in the banner opens an email
-  to hello@readfree.xyz in your mail app, filled in with what happened, the outlet and the
-  versions; never the article's address (paste it if you want that page looked at). Nothing is
+  article on archive.today and a **Try again** button (also on the note in the article).
+  **Report a problem** in the banner opens an email to hello@readfree.xyz in your mail app, filled
+  in with what happened, the outlet and the versions; never the article's address (paste it if you want that page looked at). Nothing is
   sent unless you send it.
+- **A CAPTCHA** is archive.today's to ask for and yours to complete; Read Free never goes around
+  one. **Complete the check** opens the page that asked. When you come back, Read Free tries again
+  by itself; other articles that were waiting do so too, once that worked and you get to them. Until
+  then, or for ten minutes, it doesn't ask archive.today for any other article. It asks for one
+  article at a time, a second apart, starting with the one you're looking at, which may bring on fewer.
 - **A wall it doesn't recognize** (NYT for now; sites change their walls without warning):
   - If NYT would be showing its popup, it's a wall, whatever else NYT did to the page: Read Free
     lets the popup out for an instant, before anything is drawn, and measures it.
