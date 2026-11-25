@@ -40,6 +40,8 @@
     lalibre: P(198, 'EUR', 'year', 'Numérique+', 'https://www.student.be/fr/only-for-students/30-de-reduction-pour-les-etudiants-sur-les-abonnements-a-la-libre/'), // the list price a student discount is taken off
     nrc: P(17.5, 'EUR', 'month', 'Digitaal Basis', 'https://subger.com/en/service/nrc'), // the page gives no period; a year at that price isn't plausible
     spiegel: P(21.99, 'EUR', 'month', 'SPIEGEL+', 'https://subtracker.io/kuendigen/spiegel-plus-kuendigen'),
+    // Israel
+    jpost: P(8, 'USD', 'month', 'Premium Plus', 'https://store.jpost.com', '2026-11-25'), // its own store
     // Australia
     smh: P(25.99, 'AUD', 'month', 'Digital', 'https://mumbrella.com.au/nine-publishing-hikes-digital-subscription-prices-by-20-879130'),
     theage: P(25.99, 'AUD', 'month', 'Digital', 'https://mumbrella.com.au/nine-publishing-hikes-digital-subscription-prices-by-20-879130'),
@@ -50,6 +52,8 @@
     newsweek: "its subscribe page shows no prices to a script, and other sources disagree",
     elmundo: 'no page we could open states a price',
     lemonde: 'the only page found that states one (€9.99 a month) is from 2020',
+    haaretz: 'the pages that state a price disagree ($15 to $25 a month)',
+    ynet: 'the only price found (NIS 15.90 a month) is from 2019',
   });
 
   // Units of each currency to one US dollar: the Banque de France's daily rates (euro

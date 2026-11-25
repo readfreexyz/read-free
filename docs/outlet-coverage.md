@@ -681,7 +681,7 @@ article per site. Structure and counts only. Nothing is built.
 | Die Welt | WELTplus: flag false, `hasPart .c-article-page__text.is-paywalled-content` | **cut** on the server (3 samples: about 240 characters in JSON-LD, 4 paragraphs); free articles whole | 1 of 1, same day, 42 blocks and 13.4k | archive.today swap candidate |
 | Le Parisien | subscriber articles: flag false, `hasPart .paywall-abo`; the script gets 403 | **cut** on the server (2 samples: 3 paragraphs, under 1k) | 1 of 1, same day, 32 blocks and 8.2k | archive.today swap candidate |
 | Bild | BILDplus | Bing samples free and whole (2.0–2.7k). One BILDplus-marked page: flag false, 1 paragraph, 767 characters, but it was a competition page, not an article | not checked | probably cut; needs real BILDplus samples |
-| The Jerusalem Post | none seen (flag true) | all (JSON-LD `articleBody` 2.2–3.6k matches the page) | — | free in these samples; premium section not sampled |
+| The Jerusalem Post | none seen (flag true) | all (JSON-LD `articleBody` 2.2–3.6k matches the page) | — | free in these samples; premium section not sampled (since: see "Batch 7") |
 | Die Zeit | Z+ expected | not checked: the site didn't load for the script, and the built-in browser got a 403 | — | needs the user's Chrome |
 | de Volkskrant | expected | not checked: 403 to the script, and the built-in browser wasn't allowed to open it | — | needs the user's Chrome |
 | AD | expected | not checked: 403 to the script; not tried in the browser (same publisher as de Volkskrant) | — | needs the user's Chrome |
@@ -745,3 +745,38 @@ message, NRC's cut stopped on the page).
   its old container removed later stays removed.
 - **For the user's test:** all four, as with batch 3. For El Mundo, NRC and The Independent the
   first real wall is the thing to capture (a saved page, as for the other "site bugs").
+
+## Batch 7, built (2026-11-25; 0.26.0): Israeli outlets
+
+Looked at as before: pages fetched signed out (`tools/probe-outlets.mjs`), then in the built-in
+browser, and archive.today's newest copies there. Structure and counts only.
+
+| Outlet | What was seen | Built |
+| --- | --- | --- |
+| Haaretz (haaretz.com, haaretz.co.il) | **Cut on the server**: one paragraph (151 to 431 characters) in `[data-testid=article-body-wrapper]`, then an offer block in it a few seconds later. Of those without `.premium` in the address, 5 of 8 English ones were cut too (3 whole), and 4 of 4 Hebrew ones were whole. The JSON-LD marks every article paywalled and its `articleBody` is the first paragraph alone, so it can't tell. **archive.today's copies: whole up to Nov 23 (9 of 9, 2.2–10.8k characters, some made the day of publication), the cut page on Nov 24 (9 copies of 6 articles, TheMarker's two included; the one looked into stops at Haaretz's spinner)**, so newer articles may not be there | archive.today swap, when the offer ends a teaser (or the spinner it replaces is still there after 8 s: Haaretz's API refuses headless Chrome, and an ad blocker could do the same) |
+| The Jerusalem Post | Mostly free (5 of 5). Premium (The Jerusalem Report, 3 of 3): **all** sent, the rest in `section.section-paywall.hidden`; JSON-LD `articleBody` matches (5.1k of 5.5k) | lift |
+| Ynet (ynet.co.il) | ynet+ : **all** sent (21 paragraphs, 10.5k; JSON-LD `wordCount` matches), then the React bundle's `cutArticlePremiumContent()` empties the container (780 characters left, the wall's included) | page-world guard, then lift |
+
+Not built:
+
+| Outlet | Why |
+| --- | --- |
+| TheMarker (Haaretz's business paper) | walled like Haaretz, and archive.today's copies follow the same dates: whole on Nov 5 and 15 (5 and 21 paragraphs), the cut page on Nov 24 (2 of 2). The same adapter could cover it; no documented reason found for it yet |
+| The Times of Israel | a Cloudflare check for scripts and the built-in browser; its articles are free as far as known |
+| Ynetnews, Maariv, i24NEWS, Globes (English) | no wall or paywall mark in 3 samples each (how much of the text they send wasn't measured) |
+| Israel Hayom | a bot check for scripts (English); the Hebrew site didn't answer |
+| Calcalist | 44 articles from its home page, none marked paid (the first 14 looked at: none cut); it loads Ynet's paywall script, so some may be walled |
+| Globes (Hebrew) | **metered**: 12 of 14 articles marked paid. A first-time visitor is sent them whole; with its cookies, the server sends a teaser (`.articleInner` with one `<div>` and `#pianoBlock`), and `get_all_article()` (`articleExtended.js`) fetches the rest if Piano allows it, which it did for 5 articles and not for the 6th and 7th. So it would be archive.today, which gave no copy of either article asked for (a 125-character page with no date); no documented reason found for it yet |
+| Arutz Sheva, Walla, N12 | Bing gave no samples, or the site didn't answer |
+
+- **Layout:** Haaretz's body is `display: contents` in a grid whose paragraphs name their column, so
+  the archived text was drawn 36 px wide; `sites/haaretz.css` puts it in the main column.
+- **Right to left:** Read Free's note, loading box and status bar are in English, and are now laid
+  out left to right on every page (`all: initial` doesn't reset `direction`).
+- **Tried** in headless Chrome and Firefox with the extension loaded: The Jerusalem Post and Ynet in
+  both (Ynet's site version and back in Chrome); Haaretz's swap in Firefox, in both languages (7 and 29
+  paragraphs), and four articles of Nov 24 there (cut copies in three, no copy of one: refused, and
+  the page said so). In Chrome, Haaretz reached archive.today's CAPTCHA, and the page said so.
+- **Reasons** (`src/reasons.js`): The Jerusalem Post's is from the research (PolitiFact, one retracted
+  article). Haaretz's and Ynet's aren't: an opinion piece each (Mondoweiss; The Seventh Eye, read
+  through a fetching service only). The Seventh Eye's calls Haaretz the only exception in Israel's press.

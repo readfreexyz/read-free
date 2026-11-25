@@ -58,6 +58,13 @@
     // them from a cut. The parts the extension keeps are checked.
     nrc: { home: 'https://www.nrc.nl/', method: 'lift', minBodyWords: 10 },
     independent: { home: 'https://www.independent.co.uk/', method: 'lift', minWords: 150 },
+    // Batch 7. Haaretz sends one paragraph (or the whole article, on some). Most of The Jerusalem
+    // Post's articles are free, so the samples mostly say its body is still where it was. Ynet's cut
+    // is in a 6.9 MB bundle, so only the page is checked; its text is in the container's blocks (lists
+    // and quotes as well as paragraphs).
+    haaretz: { home: 'https://www.haaretz.com/', method: 'swap', feed: 'https://www.haaretz.com/srv/haaretz-latest-headlines', minBodyWords: 10 },
+    jpost: { home: 'https://www.jpost.com/', method: 'lift', minWords: 100 },
+    ynet: { home: 'https://www.ynet.co.il/', method: 'guard', paragraphs: '[data-contents="true"] > *', minBodyWords: 10, minWords: 30, markers: { html: ['data-contents="true"', 'public-DraftEditor-content'] } },
   };
 
   root.NYTFix = Object.assign(root.NYTFix || {}, { healthSpecs: specs });

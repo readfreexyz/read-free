@@ -1,0 +1,10 @@
+/* Haaretz's article body is display: contents in a grid (margins, then a main column), and each of
+   its paragraphs names the main column. What Read Free puts in the body or before it has to as
+   well, or it's drawn in the 36px margin. The grid's 16px row gap is also all that separates the
+   paragraphs. */
+[data-testid="article-body-wrapper"] > [class*="nytfix-"],
+:has(> [data-testid="article-body-wrapper"]) > .nytfix-banner {
+  grid-column: main-start / main-end;
+  min-width: 0;
+}
+[data-testid="article-body-wrapper"] .nytfix-body p { margin-block-end: 16px; }

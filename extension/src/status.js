@@ -19,7 +19,7 @@
   // Colors from the active theme: content.css sets them on the host element (#nytfix-status) and
   // custom properties reach into the shadow root (`all: initial` leaves them alone).
   const CSS = `
-    :host { all: initial; }
+    :host { all: initial; direction: ltr; } /* all leaves direction alone, and the bar is in English on Hebrew pages too */
     .bar {
       position: fixed;
       left: 20px;

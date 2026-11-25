@@ -33,6 +33,9 @@
 }
 /* theme:end */
 
+/* In English, on right-to-left pages (Haaretz and Ynet in Hebrew) too. */
+.nytfix-banner, .nytfix-loading { direction: ltr; }
+
 /* Status banner shown above the article body. */
 .nytfix-banner {
   box-sizing: border-box;

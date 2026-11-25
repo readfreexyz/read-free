@@ -9,11 +9,11 @@ Where a wall only covers text the page already has, it takes the wall off, with 
 Otherwise it puts in the text of the newest [archive.today](https://archive.ph) snapshot of the
 article. The table under [How it works](#how-it-works) says which each site gets.
 
-It works on 25 outlets: ABC (Spain), The Age, The Atlantic, CNN, Corriere della Sera, Daily Mail,
-Der Spiegel, El Mundo, Financial Times, The Globe and Mail, The Independent, La Libre Belgique,
-Le Monde, Los Angeles Times, National Post, The New York Times, The New Yorker, Newsweek, NRC,
-Reuters, The Spectator, The Sydney Morning Herald, Toronto Star, USA Today and The Wall Street
-Journal.
+It works on 28 outlets: ABC (Spain), The Age, The Atlantic, CNN, Corriere della Sera, Daily Mail,
+Der Spiegel, El Mundo, Financial Times, The Globe and Mail, Haaretz, The Independent,
+The Jerusalem Post, La Libre Belgique, Le Monde, Los Angeles Times, National Post, The New York
+Times, The New Yorker, Newsweek, NRC, Reuters, The Spectator, The Sydney Morning Herald, Toronto
+Star, USA Today, The Wall Street Journal and Ynet.
 
 For personal use only. It goes against the publishers' terms, and the Chrome Web Store doesn't
 allow paywall-bypass extensions, so in Chrome it's loaded unpacked. In Firefox it's signed by Mozilla,
@@ -326,6 +326,9 @@ daily check on GitHub (`.github/workflows/site-health.yml`), and readers' report
 | El Mundo | `sites/elmundo.js`. Sends the whole article, premium ones included. **The wall hasn't been seen** (the consent popup was in the way), so it goes on the general signs: Piano's modal, or the text clipped, hidden or cut short. |
 | NRC | `sites/nrc.js`. The server sends the whole article, but once the meter runs out the site's script (after Zephr and Sophi decide, seconds after the page loads) cuts the drawn page to one paragraph, locks scrolling and puts `div.paywall.paywall--hard` over it. Every child of the article is kept (`live.keep`), so each goes straight back as it's removed, and the hard wall comes off. If the cut came first, archive.today fills in. The dormant `div.paywall.hidden` on other articles isn't taken for a wall. |
 | The Independent | `sites/independent.js` (independent.co.uk and the-independent.com, where American readers are sent). Sends the whole article, Independent Premium included; **no wall came up** from the US. General signs only, on articles marked paywalled. |
+| Haaretz | `sites/haaretz.js`, in English (haaretz.com) and Hebrew (haaretz.co.il). The server sends one paragraph, then an offer block in the article body; some articles come whole. The offer at the end of a teaser is the wall; it's hidden and the rest comes from archive.today. **Its copies made since November 24, 2026 are the cut page**, so for now that means articles archived before then; on newer ones the reader is told. |
+| The Jerusalem Post | `sites/jpost.js`. Most of it is free. Premium articles are sent whole, the rest of the text in a hidden `section.section-paywall`; it's shown and the Subscribe button above it hidden, with nothing fetched. |
+| Ynet | `sites/ynet.js`, `page/ynet.js` (ynet.co.il; ynetnews.com is free). ynet+ articles are sent whole; the site's React code then empties the article's container and leaves the wall. The guard keeps the container from being emptied, and the wall is hidden, with nothing fetched. If it's cut all the same, archive.today fills in. |
 | USA Today | `sites/usatoday.js`. Its stories are free and whole; what shows is Admiral's ad-blocker popup, with scrolling locked. Being a supported site is what lets the ad-blocker notice handling (`src/notices.js`) hide it and unlock scrolling. |
 
 | File | Role |

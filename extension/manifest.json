@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Read Free",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "description": "Takes paywalls off news articles (NYT, FT, The Atlantic, CNN and more), filling in cut text from archive.today.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -711,6 +711,96 @@
         "src/settings.js",
         "src/adapter.js",
         "sites/independent.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.haaretz.com/*",
+        "https://www.haaretz.co.il/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/haaretz.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css",
+        "sites/haaretz.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.jpost.com/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/jpost.js",
+        "src/reasons.js",
+        "src/tally.js",
+        "src/notify.js",
+        "src/content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.ynet.co.il/*"
+      ],
+      "js": [
+        "page/ynet.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.ynet.co.il/*"
+      ],
+      "js": [
+        "src/archive.js",
+        "src/extract.js",
+        "src/render.js",
+        "src/status.js",
+        "src/paywall.js",
+        "src/notices.js",
+        "src/cache.js",
+        "src/scroll.js",
+        "src/settings.js",
+        "src/adapter.js",
+        "sites/ynet.js",
         "src/reasons.js",
         "src/tally.js",
         "src/notify.js",

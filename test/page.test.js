@@ -247,3 +247,89 @@ test('newyorker: another page: what was held on the one before no longer counts'
   page.send('hold');
   assert.equal(page.held(), null);
 });
+
+const YNET = fs.readFileSync(path.join(__dirname, '../extension/page/ynet.js'), 'utf8');
+
+// The wall drawn in the third paragraph, as the site's React code does, and its
+// cutArticlePremiumContent() (read in its bundle, 2026-11-25).
+function ynetPage({ guard = true, wall = true } = {}) {
+  const ps = Array.from({ length: 6 }, (_, i) => `<div class="text_editor_paragraph rtl"><span>Paragraph ${i + 1}</span>${wall && i === 2 ? '<span><span class="wall-paragraph"><div class="paywall-wrapper"><div id="ynet_premium_blocked">Subscribe</div></div></span></span>' : ''}</div>`);
+  const { window } = new JSDOM(`<!doctype html><html><body><div class="public-DraftEditor-content"><div data-contents="true">${ps.join('')}</div></div><div id="other">x</div></body></html>`, { url: 'https://www.ynet.co.il/news/article/yokra14963170', runScripts: 'outside-only' });
+  window.console.info = () => {};
+  if (guard) window.eval(YNET);
+  const doc = window.document;
+  const cut = () => {
+    const container = doc.querySelector('.public-DraftEditor-content [data-contents="true"]');
+    const box = container.querySelector('.text_editor_paragraph .paywall-wrapper');
+    if (!box) return;
+    const paragraph = box.parentElement.parentElement;
+    container.innerHTML = '';
+    container.appendChild(paragraph);
+  };
+  const send = action => doc.dispatchEvent(new window.CustomEvent(`nytfix:${action}`));
+  return {
+    window, doc, cut, send,
+    paragraphs: () => [...doc.querySelectorAll('[data-contents] > .text_editor_paragraph')].map(p => p.textContent),
+    wall: () => doc.querySelectorAll('[data-contents] .paywall-wrapper').length,
+    held: () => doc.documentElement.getAttribute('data-nytfix-held'),
+  };
+}
+const YNET_WHOLE = Array.from({ length: 6 }, (_, i) => `Paragraph ${i + 1}`);
+
+test("ynet: without the guard, the site leaves the wall alone (the test's premise)", () => {
+  const page = ynetPage({ guard: false });
+  page.cut();
+  assert.deepEqual([page.paragraphs(), page.wall()], [[], 1]);
+});
+
+test('ynet: the article is kept, the wall below it, and said to be', () => {
+  const page = ynetPage();
+  assert.equal(page.held(), null);
+  page.cut();
+  assert.deepEqual(page.paragraphs(), YNET_WHOLE);
+  assert.equal(page.doc.querySelector('[data-contents]').lastElementChild.querySelector('.paywall-wrapper') !== null, true);
+  assert.equal(page.held(), 'cut');
+});
+
+test('ynet: every other innerHTML goes as before', () => {
+  const page = ynetPage({ wall: false });
+  const other = page.doc.getElementById('other');
+  other.innerHTML = '<b>y</b>';
+  assert.equal(other.innerHTML, '<b>y</b>');
+  other.innerHTML = '';
+  assert.equal(other.childNodes.length, 0);
+  const container = page.doc.querySelector('[data-contents]');
+  container.innerHTML = ''; // no wall in it: not the cut
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(page.held(), null);
+  const walled = ynetPage().doc.querySelector('[data-contents]');
+  walled.innerHTML = '<p>redrawn</p>';
+  assert.equal(walled.textContent, 'redrawn', 'a redraw, not the cut');
+});
+
+test('ynet: release leaves the wall alone, as the site would; hold brings the article back, in order', () => {
+  const page = ynetPage();
+  page.cut();
+  page.send('release');
+  assert.deepEqual([page.paragraphs(), page.wall(), page.held()], [[], 1, null]);
+  page.send('release'); // twice is as good as once
+  page.send('hold');
+  assert.deepEqual([page.paragraphs(), page.wall(), page.held()], [YNET_WHOLE, 1, 'cut']);
+});
+
+test("ynet: cut while the reader has the site's version, the article still comes back", () => {
+  const page = ynetPage();
+  page.send('release');
+  page.cut();
+  assert.deepEqual([page.paragraphs(), page.wall(), page.held()], [[], 1, null]);
+  page.send('hold');
+  assert.deepEqual([page.paragraphs(), page.wall(), page.held()], [YNET_WHOLE, 1, 'cut']);
+});
+
+test('ynet: another page: what was held on the one before no longer counts', () => {
+  const page = ynetPage();
+  page.cut();
+  page.doc.querySelector('.public-DraftEditor-content').remove();
+  page.send('hold');
+  assert.equal(page.held(), null);
+});

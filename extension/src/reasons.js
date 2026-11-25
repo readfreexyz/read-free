@@ -23,6 +23,15 @@
 //   The Age.
 // - Centre for Media Monitoring, "Media Bias: Gaza 2023–24" (2024): Douglas Murray's Spectator
 //   column; Mail Online on Herzog's chemical-weapons claim and its share of emotive terms.
+// - PolitiFact (Dec 2023): one Jerusalem Post article, published and removed. The Daily Beast (Dec 2,
+//   2023) says the same.
+// - Mondoweiss (Feb 2024), an opinion piece by Jonathan Ofir on Haaretz: a lifestyle article and two
+//   on al-Shifa Hospital and UNRWA. Others call Haaretz the exception in Israel's press (Mother
+//   Jones, Oct 2025; The Seventh Eye, below), and Israel's cabinet ended its advertising there in
+//   2024 (a Reuters Institute paper, Dec 2024), so this is the most contested of the reasons.
+// - The Seventh Eye (Aug 2025), an opinion piece by Amnon Yuval: the techniques of Israel's Hebrew
+//   press, Yedioth Ahronoth and Ynet named. READ THROUGH A FETCHING SERVICE ONLY: its own
+//   page puts the built-in browser through a Cloudflare check. Confirm it in a browser.
 // The New Yorker isn't in the research, so it has no reason here (NO_REASON); none is made up.
 (function (root) {
   'use strict';
@@ -97,6 +106,19 @@
     },
     abces: MERCA2,
     elmundo: MERCA2,
+    // Batch 7, the Israeli outlets (not in the research, except The Jerusalem Post).
+    haaretz: {
+      text: "An opinion piece in Mondoweiss said it “published and promoted some of the most harmful propaganda” in support of Israel's genocide in Gaza, citing articles on al-Shifa Hospital and UNRWA.",
+      source: { name: 'Mondoweiss', year: 2024, href: 'https://mondoweiss.net/2024/02/how-haaretz-has-aided-israels-genocide-in-gaza/' },
+    },
+    jpost: {
+      text: 'PolitiFact reported that it published an article claiming a dead Palestinian baby was a doll, then took it down and blamed “faulty sourcing.”',
+      source: { name: 'PolitiFact', year: 2023, href: 'https://www.politifact.com/factchecks/2023/dec/08/tiktok-posts/no-a-palestinian-man-holding-his-deceased-grandson' },
+    },
+    ynet: {
+      text: 'An opinion piece in The Seventh Eye, an Israeli media watchdog, named Ynet among the outlets whose techniques make atrocities in Gaza disappear from view.',
+      source: { name: 'The Seventh Eye', year: 2025, href: 'https://www.the7eye.org.il/560629' },
+    },
   };
 
   // Sites with no documented reason yet: they get no "why", and a test keeps every other site
