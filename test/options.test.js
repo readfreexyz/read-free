@@ -69,7 +69,7 @@ async function openPage({ saveFirst = 0 } = {}) {
   }
   const $ = id => window.document.getElementById(id);
   const titles = () => [...$('saved-list').querySelectorAll('a')].map(a => a.textContent);
-  for (let i = 0; i < 100 && !/saved articles|Clear all/.test($('clear').textContent.replace('Clear saved articles', '')); i++) await sleep(10);
+  for (let i = 0; i < 100 && !/^(?:No saved articles|Clear all \()/.test($('clear').textContent); i++) await sleep(10);
   return { window, $, titles, save, cache, close: () => window.close() };
 }
 
