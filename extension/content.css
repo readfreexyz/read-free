@@ -168,13 +168,30 @@ html.nytfix-active body :has(> .nytfix-loading, > .nytfix-loading-row)::after { 
 /* National Post keeps its body invisible until its paywall script has decided. */
 html body [data-nytfix-swapped][data-nytfix-swapped] { visibility: visible !important; }
 
-/* Photos in the archived text. */
-.nytfix-figure { margin: 32px 0; }
+/* Photos in the archived text. The figure is as wide as its photo, centered, so the caption sits
+   under the photo even where the article's box is wider than its text (The Atlantic's spans the
+   window); the caption wraps to that width rather than widening it. */
+.nytfix-figure { width: fit-content; max-width: 100%; margin: 32px auto; }
 .nytfix-figure img { display: block; max-width: 100%; width: auto; height: auto; margin: 0 auto; } /* never stretched past its real size */
 .nytfix-figure figcaption {
+  width: 0;
+  min-width: 100%;
   margin-top: 8px;
   color: #5a5a5a;
   font: 14px/1.45 nyt-imperial, georgia, "times new roman", times, serif;
+}
+
+/* A break between sections of the article: a short rule, centered, whatever the site does with <hr>. */
+html body .nytfix-body hr.nytfix-break {
+  display: block !important;
+  width: 64px !important;
+  height: 0 !important;
+  margin: 40px auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid currentColor !important;
+  background: none !important;
+  opacity: 0.35;
 }
 
 /* Used only when the live page has no paragraphs to copy styles from. */

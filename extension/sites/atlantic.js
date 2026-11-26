@@ -19,12 +19,57 @@
   // ran 8.5k–15k characters (roughly 1,400–2,500 words); the cut one had 341.
   const CUT_WORDS = 600;
 
+  // A photo's address, if it is one of The Atlantic's own resized copies (…/thumbor/<signature>/
+  // [0x0:1920x1280/]750x500/media/…). Unresized, it's the photographer's file: too heavy.
+  const PHOTO = /^https:\/\/cdn\.theatlantic\.com\/thumbor\/[^\s,]+$/;
+  const isPhoto = url => PHOTO.test(url || '') && /\/\d+x\d+\//.test(url);
+  // A srcset as [{ url, w?, x? }]: "a.jpg, b.jpg 2x" or "a.jpg 655w, b.jpg 750w".
+  const sources = srcSet => String(srcSet || '').split(/,\s+/).map(entry => {
+    const [url, descriptor = ''] = entry.trim().split(/\s+/);
+    const n = parseFloat(descriptor);
+    return { url, w: /w$/.test(descriptor) ? n : null, x: /x$/.test(descriptor) ? n : descriptor ? null : 1 };
+  }).filter(s => isPhoto(s.url));
+  // About the body's width (665 px), and twice that for sharp screens.
+  const COLUMN = 665;
+  const textOf = (doc, html) => new doc.defaultView.DOMParser().parseFromString(String(html || ''), 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
+  // One of the article's photos as a figure block, or null. Seen (the user's Chrome, 2026-11-26):
+  // without a crop, url is a resized copy and srcSet "url, url2x 2x"; with one, crop.url is a
+  // resized copy and crop.srcSet lists widths ("… 655w, … 750w, … 1310w"), while the photo's own
+  // url is then the unresized upload (up to 1,920 px and more: never used).
+  // shared: a group's own caption and credit, for its last photo: descriptions first, credits last.
+  function photo(doc, image, shared = {}) {
+    const crop = image?.crop;
+    const list = sources(crop ? crop.srcSet : image?.srcSet);
+    let src = null;
+    let hires = null;
+    if (list.some(s => s.w)) {
+      const byWidth = list.filter(s => s.w).sort((a, b) => a.w - b.w);
+      const atLeast = min => byWidth.find(s => s.w >= min) || byWidth[byWidth.length - 1];
+      src = atLeast(COLUMN).url;
+      hires = atLeast(COLUMN * 2).url;
+    } else {
+      src = list.find(s => s.x === 1)?.url || null;
+      hires = list.find(s => s.x === 2)?.url || null;
+    }
+    const own = crop ? crop.url : image?.url;
+    if (!src && isPhoto(own)) src = own;
+    if (!src) return null;
+    const caption = [image.captionText, shared.captionText, image.attributionText, shared.attributionText].map(html => textOf(doc, html)).filter(Boolean).join(' ');
+    const figure = { type: 'figure', src, alt: textOf(doc, image.altText), caption };
+    if (hires && hires !== src) figure.hires = hires;
+    return figure;
+  }
+
   // The whole article, from the data the page is sent (#__NEXT_DATA__): one of pageProps.urqlState's
   // answers holds article.content. In the user's Chrome, 2026-11-25, past the meter: 19 paragraphs,
   // 1,456 words, with 298 showing; and 19, 1,325 words, with 3 paragraphs showing. Seen there:
   // ArticleParagraphContent { innerHtml }, ArticleRelatedContentLink (not the article's). Others are
   // handled from their names. There's no word count to check it against: it has to be this page's
   // article, and more of it than the page shows (content.js).
+  // A magazine feature (2026-11-26): 110 paragraphs in 10 sections, each section's first one with
+  // subtype DROPCAP (the article's first too); an empty ArticleLegacyHtml HR before the closing
+  // note; photos as ArticleInlineImage, ArticleWellInlineImage, ArticleFullBleedInlineImage and
+  // ArticleOverflowImageGroup { images, captionText, attributionText }.
   function articleFromPage(doc) {
     let article = null;
     try {
@@ -48,12 +93,33 @@
       const text = list.map(run => run.text).join('').replace(/\s+/g, ' ').trim();
       return text ? { text, inlines: list } : null;
     };
+    let sections = 0;
+    // A break between sections: never first, never two in a row.
+    const sectionBreak = () => {
+      if (blocks.length && blocks[blocks.length - 1].type !== 'break') blocks.push({ type: 'break' });
+    };
     for (const part of article.content) {
       const type = part?.__typename || '';
       const html = typeof part?.innerHtml === 'string' ? part.innerHtml : '';
       if (/Paragraph/.test(type)) {
         const p = paragraph(html);
-        if (p) blocks.push({ type: 'paragraph', ...p });
+        if (!p) continue;
+        if (part.subtype === 'DROPCAP' && sections++ > 0) sectionBreak();
+        blocks.push({ type: 'paragraph', ...p });
+      } else if (type === 'ArticleLegacyHtml' && /^hr$/i.test(part.tagName || '')) {
+        sectionBreak();
+      } else if (Array.isArray(part?.images) && /Image/.test(type)) {
+        // The group's caption goes under its last photo shown.
+        const made = part.images.map(image => photo(doc, image));
+        const last = made.findLastIndex(Boolean);
+        if (last >= 0) made[last] = photo(doc, part.images[last], part);
+        const figures = made.filter(Boolean);
+        left += part.images.length - figures.length;
+        blocks.push(...figures);
+      } else if (/Image$/.test(type)) {
+        const figure = photo(doc, part);
+        if (figure) blocks.push(figure);
+        else left++;
       } else if (/Heading|Subhead/.test(type)) {
         const h = paragraph(html);
         if (h) blocks.push({ type: 'heading', text: h.text });
@@ -68,6 +134,7 @@
       } else if (/Image|Photo|Gallery|Video|Embed|Audio|Interactive|Chart/.test(type)) left++;
       // Else not the article's: related links, pull quotes, newsletter boxes
     }
+    while (blocks[blocks.length - 1]?.type === 'break') blocks.pop();
     const paragraphs = blocks.filter(b => b.type === 'paragraph');
     if (paragraphs.length < 3) return null;
     return { blocks, paragraphs: paragraphs.length, chars: paragraphs.reduce((n, b) => n + b.text.length, 0), left, leftAs: ['photo or graphic', 'photos or graphics'] };

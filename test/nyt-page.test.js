@@ -95,6 +95,53 @@ test('Atlantic: headings, lists and quotes; web links and emphasis only; related
   assert.equal(article.left, 1);
 });
 
+// Photos as the user's Chrome showed them (2026-11-26), with made-up signatures and captions.
+const thumb = size => `https://cdn.theatlantic.com/thumbor/SiGnAtUrE0123456789abcd=/${size}media/img/posts/2026/11/photo/original.jpg`;
+const sized = { __typename: 'ArticleInlineImage', url: thumb('928x522/'), srcSet: `${thumb('928x522/')}, ${thumb('1856x1044/')} 2x`, altText: 'A <em>made-up</em> photo', captionText: '', attributionText: 'Photograph by <em>Someone</em> for The Atlantic', crop: null };
+const cropped = (cap = '') => ({ __typename: 'ArticleInlineImage', url: thumb('0x0:1920x1280/'), srcSet: thumb('0x0:1920x1280/'), altText: '', captionText: cap, attributionText: 'Agency', crop: { url: thumb('0x0:1920x1280/655x437/'), srcSet: [655, 750, 850, 928, 1310].map(w => `${thumb(`0x0:1920x1280/${w}x${Math.round(w * 2 / 3)}/`)} ${w}w`).join(', ') } });
+const drop = text => ({ __typename: 'ArticleParagraphContent', subtype: 'DROPCAP', innerHtml: text });
+
+test('Atlantic: photos come along as resized copies, sharper ones for 2x screens, with their credits', () => {
+  const article = readAtlantic({ count: 4, parts: [
+    sized,
+    { __typename: 'ArticleWellInlineImage', ...cropped('A caption.') },
+    { __typename: 'ArticleOverflowImageGroup', captionText: 'The group\'s caption.', attributionText: '', images: [cropped(), cropped(), { ...cropped(), crop: null }] },
+    { __typename: 'ArticleFullBleedInlineImage', ...cropped(), url: 'https://evil.example/thumbor/x/750x500/a.jpg', crop: { url: 'https://evil.example/thumbor/x/750x500/a.jpg', srcSet: 'https://evil.example/thumbor/x/750x500/a.jpg 750w' } },
+  ] });
+  const figures = article.blocks.filter(b => b.type === 'figure');
+  assert.equal(figures.length, 4);
+  assert.deepEqual(figures[0], { type: 'figure', src: thumb('928x522/'), hires: thumb('1856x1044/'), alt: 'A made-up photo', caption: 'Photograph by Someone for The Atlantic' });
+  assert.equal(figures[1].src, thumb('0x0:1920x1280/750x500/'), 'the first width at least the column\'s');
+  assert.equal(figures[1].hires, thumb('0x0:1920x1280/1310x873/'), 'the widest, short of twice that');
+  assert.equal(figures[1].caption, 'A caption. Agency');
+  assert.deepEqual(figures.slice(2).map(f => f.caption), ['Agency', 'The group\'s caption. Agency'], 'the group\'s caption under its last photo shown, before the credit');
+  assert.equal(article.left, 2, 'an unresized upload and another host are left out, and counted');
+  assert.ok(figures.every(f => f.src.startsWith('https://cdn.theatlantic.com/thumbor/')));
+});
+
+test('Atlantic: a break between sections, never before the first or two in a row; the closing rule too', () => {
+  const article = readAtlantic({ count: 0, parts: [
+    { __typename: 'ArticleParagraphContent', innerHtml: 'This article was in a newsletter.' },
+    drop('The article starts.'),
+    { __typename: 'ArticleParagraphContent', innerHtml: 'More of the first section.' },
+    drop('The second section.'),
+    sized,
+    drop('The third section.'),
+    { __typename: 'ArticleLegacyHtml', tagName: 'HR', innerHtml: '' },
+    drop('The fourth section, after a rule of its own.'),
+    { __typename: 'ArticleLegacyHtml', tagName: 'HR', innerHtml: '' },
+    { __typename: 'ArticleLegacyHtml', tagName: 'DIV', innerHtml: '<div>Something else</div>' },
+    { __typename: 'ArticleParagraphContent', innerHtml: 'A closing note.' },
+    { __typename: 'ArticleLegacyHtml', tagName: 'HR', innerHtml: '' },
+  ] });
+  assert.deepEqual(article.blocks.map(b => b.type === 'paragraph' ? b.text : b.type), [
+    'This article was in a newsletter.', 'The article starts.', 'More of the first section.', 'break',
+    'The second section.', 'figure', 'break', 'The third section.', 'break', 'The fourth section, after a rule of its own.',
+    'break', 'A closing note.',
+  ]);
+  assert.equal(article.paragraphs, 7);
+});
+
 test('Atlantic: too little, for another article, or not there: null', () => {
   assert.equal(readAtlantic({ count: 2, text: 'Long enough to be more than the page shows. '.repeat(80) }), null, 'two paragraphs are no article');
   assert.equal(readAtlantic({ path: '/health/2026/11/another/1/' }), null);

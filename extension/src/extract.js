@@ -14,6 +14,7 @@
 //   { type: 'paragraph', text, inlines: [{ text, href?, em?, strong? }] }
 //   { type: 'heading', text }
 //   { type: 'figure', src, hires?, alt, caption }
+//   { type: 'break' }  between sections of the article (sites that say where they are)
 //   hires: a sharper copy of the same photo (for 2x screens), when the site adapter knows how to
 //   ask the site's image server for one (site.snapshot.hiresImage). Snapshots drop srcset, so all
 //   that's left is the one size the page happened to load when it was captured.

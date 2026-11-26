@@ -222,6 +222,19 @@ test('an unsafe sharper copy is ignored; the photo keeps its own address', () =>
   for (const img of doc.querySelectorAll('.nytfix-body img')) assert.equal(img.hasAttribute('srcset'), false, img.src);
 });
 
+test('a break between sections becomes a short rule between the paragraphs', () => {
+  const doc = parse(livePageHtml());
+  applyTo(doc, { blocks: [
+    { type: 'paragraph', text: 'End of one section.' },
+    { type: 'break' },
+    { type: 'paragraph', text: 'Start of the next.' },
+  ] });
+  const body = doc.querySelector('.nytfix-body');
+  const parts = [...body.querySelectorAll('p, hr')].map(el => el.tagName + (el.className.includes('nytfix-break') ? '.nytfix-break' : ''));
+  assert.deepEqual(parts.map(t => t.replace(/^P.*/, 'P')), ['P', 'HR.nytfix-break', 'P']);
+  assert.equal(body.querySelector('hr').textContent, '');
+});
+
 test('unsafe links and image addresses are dropped; the text stays', () => {
   const doc = parse(livePageHtml());
   applyTo(doc, {

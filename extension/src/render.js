@@ -264,6 +264,12 @@
 
   function buildBlock(doc, block, template) {
     if (block.type === 'figure') return buildFigure(doc, block);
+    // A break between sections of the article
+    if (block.type === 'break') {
+      const hr = doc.createElement('hr');
+      hr.className = 'nytfix-break';
+      return hr;
+    }
     if (block.type === 'heading') {
       const h2 = doc.createElement('h2');
       h2.textContent = block.text;
