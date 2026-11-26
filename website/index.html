@@ -114,6 +114,17 @@
     /* What isn't for a computer running Chrome or Firefox: a phone or tablet (by CSS alone, from the
        kind of pointer, so it shows without the script and not on a narrow window of a computer), and
        Safari (by the script). */
+    /* What it is, why, and why trust it, above the steps: the boycott as a sentence, then what it is
+       and why to trust it in a strip below (side by side, or stacked on a phone) */
+    .about { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .about svg { flex: none; fill: none; stroke: var(--accent); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .about-lead { display: flex; gap: 12px; align-items: flex-start; margin: 0; padding: 18px 20px; font-size: 16px; line-height: 1.5; }
+    .about-lead svg { width: 24px; height: 24px; margin-top: 1px; }
+    .about-lead b { font-weight: 700; }
+    .about ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); background: var(--surface-2); }
+    .about li { display: flex; gap: 10px; align-items: center; padding: 12px 20px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .about li + li { border-left: 1px solid var(--line); }
+    .about li svg { width: 18px; height: 18px; }
     .phone, .notice { margin: 0; padding: 14px 18px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; background: var(--surface); }
     .phone { display: none; }
     @media (hover: none) and (pointer: coarse) { .phone { display: block; } }
@@ -215,7 +226,10 @@
     footer code { font: 12px var(--mono); overflow-wrap: anywhere; }
 
     @media (max-width: 760px) {
-      .options { grid-template-columns: minmax(0, 1fr); }
+      .options, .about ul { grid-template-columns: minmax(0, 1fr); }
+      .about-lead { padding: 14px 16px; font-size: 15.5px; }
+      .about li { padding: 10px 16px; }
+      .about li + li { border-left: 0; border-top: 1px solid var(--line); }
       .or { justify-self: center; }
       .top-inner { gap: 14px; padding: 24px 16px; }
       .logo { width: 48px; height: 48px; }
@@ -262,6 +276,18 @@
   </header>
 
   <main>
+    <div class="about">
+      <p class="about-lead"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg>
+        <span>Read Free is <b>a financial boycott</b> of news outlets over their pro-Israel coverage of the
+          genocide of Palestinians.</span></p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M3.5 9h17M6.5 7h.01M9 7h.01"/></svg>
+          <span>A browser extension that opens their paywalled articles.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5l-3 14"/></svg>
+          <span><a href="https://github.com/readfreexyz/read-free">Open source</a>, with no ads, analytics or trackers.</span></li>
+      </ul>
+    </div>
+
     <p class="phone"><b>On a phone?</b> Read Free works in
       <!-- firefox -->
       Chrome or Firefox
