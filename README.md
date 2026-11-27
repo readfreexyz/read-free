@@ -221,8 +221,9 @@ otherwise stops extension storage at 10 MB).
   the toolbar menu always checks again.
 - **Moving between articles:** if NYT shows another article without a full page load, the
   extension starts over for that article.
-- **Problems:** a CAPTCHA, a timeout or a network error shows a red banner with a link to the
-  article on archive.today and a **Try again** button (also on the note in the article).
+- **Problems:** a timeout or a network error shows a red banner with a link to the article on
+  archive.today and a **Try again** button (also on the note in the article); a CAPTCHA, its own
+  (below).
   **Report a problem** in the banner opens an email to hello@readfree.xyz in your mail app, filled
   in with what happened, the outlet and the versions; never the article's address (paste it if you want that page looked at). Nothing is
   sent unless you send it.
