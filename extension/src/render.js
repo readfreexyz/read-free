@@ -243,12 +243,14 @@
     figure.className = 'nytfix-figure';
     const img = doc.createElement('img');
     // A sharper copy for 2x screens, if the site has one. Should it fail to load, fall back to
-    // the size the snapshot had.
+    // the size the snapshot had; should that fail too (a broken copy on archive.today), the photo
+    // goes, rather than leave a gap.
     const hires = safeSrc(block.hires);
-    if (hires && !/[\s,]/.test(src + hires)) {
-      img.srcset = `${src} 1x, ${hires} 2x`;
-      img.addEventListener('error', () => img.removeAttribute('srcset'), { once: true });
-    }
+    if (hires && !/[\s,]/.test(src + hires)) img.srcset = `${src} 1x, ${hires} 2x`;
+    img.addEventListener('error', () => {
+      if (img.hasAttribute('srcset')) img.removeAttribute('srcset');
+      else figure.remove();
+    });
     img.src = src;
     img.alt = block.alt || '';
     img.setAttribute('loading', 'lazy');
@@ -356,6 +358,9 @@
     }
     const section = liveArticleBody(doc, site);
     if (section) section.before(banner);
+    // The site's wall is showing again (FT's barrier page, its headline and offers, when
+    // archive.today couldn't help): above it, not under the offers.
+    else if (doc.documentElement.classList.contains(OFF_CLASS)) fallbackContainer(doc, site).prepend(banner);
     else placeWithoutBody(doc, site, banner, { first: true });
     return banner;
   }
@@ -713,11 +718,12 @@
     for (const chunk of chunks) chunk.setAttribute(SWAPPED_ATTR, '');
     if (section) section.append(body);
     else placeWithoutBody(doc, site, body);
+    const leftOut = left ? ` ${left === 1 ? `A ${leftAs[0]}` : `${left} ${leftAs[1]}`} couldn't come along.` : '';
     showBanner(doc, site, {
       kind: 'done',
       message: snapshotUrl
-        ? `Full text from the archive.today snapshot of ${describeTime(snapshotTime)}.`
-        : `Full text, from ${site.shortName || site.name}'s own page.${left ? ` ${left === 1 ? `A ${leftAs[0]}` : `${left} ${leftAs[1]}`} couldn't come along.` : ''}`,
+        ? `Full text from the archive.today snapshot of ${describeTime(snapshotTime)}.${leftOut}`
+        : `Full text, from ${site.shortName || site.name}'s own page.${leftOut}`,
       links: snapshotUrl ? [{ text: 'View snapshot', href: snapshotUrl }] : [],
       actions: [{ text: `Show ${site.shortName}'s version`, onClick: () => onRestore?.() }],
     });

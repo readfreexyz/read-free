@@ -117,8 +117,9 @@
 
   // Shows the bar and returns a controller:
   //   stage(name, text, { expectedMs, slowAfterMs, slowLabel })  name: 'find' | 'download' | 'extract'
-  //   finish(kind, text, { hideAfterMs, link })                   kind: 'done' | 'info' | 'error'
+  //   finish(kind, text, { hideAfterMs, link, action, ... })      kind: 'done' | 'info' | 'error'
   //     link: optional { text, href } shown after the message (https only)
+  //     action: optional { text, onClick } or { text, href }: what the reader has to do next
   //   remove()
   function create(doc, { clock = Date.now } = {}) {
     removeShowing(doc);
@@ -243,9 +244,13 @@
     //            (https only)
     //   offer    { button, onAccept, report: { text, href, title } }: something the reader can have
     //            done here, and an email link (mailto: only)
-    // A bar with a reason, a donation link, a newer version or an offer closes with its × only, so
-    // its links can be used; any other finished bar closes on a click anywhere.
-    function finish(kind, text, { link = null, reason = null, explain = false, donate = null, newer = null, offer = null, hideAfterMs = kind === 'error' ? 8000 : link ? 6000 : 3000 } = {}) {
+    //   action   { text, onClick } (a button) or { text, href } (a link, https only): what the
+    //            reader has to do before Read Free can go on (archive.today's CAPTCHA). The bar then
+    //            stays until it's closed or replaced: it's the one thing every site shows in the same
+    //            place, wherever the page put the banner and the note.
+    // A bar with a reason, a donation link, a newer version, an offer or an action closes with its ×
+    // only, so its links can be used; any other finished bar closes on a click anywhere.
+    function finish(kind, text, { link = null, reason = null, explain = false, donate = null, newer = null, offer = null, action = null, hideAfterMs = kind === 'error' ? 8000 : link ? 6000 : 3000 } = {}) {
       finished = true;
       win.clearInterval(ticker);
       bar.classList.remove('pending');
@@ -254,7 +259,8 @@
       label.textContent = text;
       if (link && /^https:\/\//i.test(link.href)) time.replaceWith(outLink('link', link.short || link.text, link.href));
       const showNewer = Boolean(newer && /^https:\/\//i.test(newer.href));
-      const extras = Boolean(reason || donate || showNewer || offer || whyBlock);
+      const act = action && (action.onClick || /^https:\/\//i.test(action.href)) ? action : null;
+      const extras = Boolean(reason || donate || showNewer || offer || act || whyBlock);
       if (reason && !whyBlock) {
         why(reason, { open: explain });
         if (!explain) {
@@ -304,6 +310,14 @@
         }
         track.before(note);
       }
+      if (act) {
+        const note = el(doc, 'div', 'ask act');
+        // Not removed on a click: the reader may need it again (a window closed, a check not done)
+        note.append(act.onClick
+          ? a11yButton('give accept', act.text, act.onClick)
+          : outLink('give accept', `${act.text} \u2197`, act.href));
+        track.before(note);
+      }
       if (extras) {
         bar.dataset.extras = '';
         resumeMs = Math.max(resumeMs, 8000);
@@ -311,6 +325,7 @@
         row.lastChild.setAttribute('aria-label', 'Close');
       }
       update();
+      if (act) return; // stays
       hideIn(hideAfterMs);
       bar.addEventListener('mouseenter', hold);
       bar.addEventListener('mouseleave', () => hideIn(resumeMs));

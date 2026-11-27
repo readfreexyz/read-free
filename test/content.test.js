@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const manifest = require('../extension/manifest.json');
-const { livePageHtml, withData, inline, block, interactivePageHtml, pinInteractive, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
+const { livePageHtml, withData, inline, block, interactivePageHtml, pinInteractive, ftLivePageHtml, atlanticLivePageHtml, atlanticSnapshotHtml, newyorkerLivePageHtml, newyorkerSnapshotHtml, cookingLivePageHtml, genericLivePageHtml, genericSnapshotHtml, latimesLivePageHtml, thestarLivePageHtml, nineLivePageHtml, nineSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml, reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml, raiseWall, snapshotHtml, ftSnapshotHtml, FT_LEAD, timemapFor, mementoUrl, memoryArea } = require('./fixtures.js');
 const { VERSION: CACHE_VERSION } = require('../extension/src/cache.js');
 const archive = require('../extension/src/archive.js');
 
@@ -150,6 +150,8 @@ function boot({ url = ARTICLE, html = livePageHtml(), responses = {}, storage = 
     body: () => doc.querySelector('.nytfix-body'),
     banner: () => doc.getElementById('nytfix-banner'),
     button: label => [...(doc.getElementById('nytfix-banner')?.querySelectorAll('button') || [])].find(b => b.textContent === label),
+    // The status bar's own button or link (a link ends in ↗)
+    barButton: label => [...(doc.getElementById('nytfix-status')?.shadowRoot.querySelectorAll('.act button, .act a') || [])].find(b => b.textContent.replace(/ \u2197$/, '') === label),
     close: () => {
       const stray = leaked();
       window.close();
@@ -674,7 +676,7 @@ test('the other address wants a CAPTCHA: it says which, links there, and asks no
     assert.match(page.banner().textContent, /archive\.is wants a CAPTCHA/);
     page.button('Complete the check').click();
     await sleep(0);
-    assert.equal(page.opened[0][0], newestUrl(ARTICLE, 'archive.is'));
+    assert.equal(page.opened[0][0], archive.searchUrl(ARTICLE, 'archive.is'), 'its search page, at the address that asked');
     assert.deepEqual(page.fetched, [newestUrl(ARTICLE), newestUrl(ARTICLE, 'archive.is')]);
   } finally {
     page.close();
@@ -1039,6 +1041,31 @@ test('FT: the barrier page is picked up at once, and the archived article goes i
   }
 });
 
+test("FT: the lead photo goes in under the headline, and the banner says the charts couldn't come along, saved copy too", async () => {
+  const responses = { [newestUrl(FT_ARTICLE)]: { ...ok(ftSnapshotHtml({ paragraphs: 8, lead: true, charts: 2 })), url: snapshotUrl(T[3], FT_ARTICLE) } };
+  const storage = memoryArea();
+  const page = boot({ url: FT_ARTICLE, html: ftLivePageHtml(), responses, storage });
+  try {
+    await waitFor(page.body);
+    const first = page.body().firstElementChild;
+    assert.equal(first.tagName, 'FIGURE');
+    assert.equal(first.querySelector('img').src, FT_LEAD);
+    assert.match(first.querySelector('img').srcset, /width=2048/);
+    assert.equal(page.body().querySelectorAll('figure').length, 2, 'the lead and the body photo; no chart');
+    assert.match(page.banner().textContent, /snapshot of .+\. 2 charts couldn't come along\./);
+  } finally {
+    page.close();
+  }
+  const again = boot({ url: FT_ARTICLE, html: ftLivePageHtml(), storage });
+  try {
+    await waitFor(again.body);
+    assert.deepEqual(again.fetched, [], 'the saved copy');
+    assert.match(again.banner().textContent, /2 charts couldn't come along\./);
+  } finally {
+    again.close();
+  }
+});
+
 test("FT: while archive.today loads, a loading box sits under FT's headline", async () => {
   let release;
   const page = boot({
@@ -1066,6 +1093,7 @@ test("FT: when archive.today has nothing, FT's barrier page shows again under a 
   try {
     await waitFor(() => /no snapshot of this article yet/.test(page.banner()?.textContent || ''));
     assert.ok(page.doc.documentElement.classList.contains('nytfix-off'));
+    assert.equal(page.doc.querySelector('main#site-content').firstElementChild, page.banner(), 'above it, not under the offers');
     assert.equal(page.body(), null);
   } finally {
     page.close();
@@ -2145,6 +2173,20 @@ test("something unknown that NYT shows: after a wait NYT's version goes back up,
   }
 });
 
+test("a CAPTCHA asked for by hand on a page that then looks cut off: the bar keeps the check's button", async () => {
+  const page = boot({ html: unknownWall({ upsell: 'inside', popup: '', shown: false }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE }, scripts: quick(ARTICLE).map(s => s.replace('cutAfterMs = 100', 'cutAfterMs = 300')) });
+  try {
+    await page.started();
+    await page.toggle();
+    await waitFor(() => page.barButton('Complete the check'));
+    await sleep(600);
+    assert.ok(page.barButton('Complete the check'), 'not replaced by the cut-off note');
+    assert.equal((await page.state()).missed, undefined);
+  } finally {
+    page.close();
+  }
+});
+
 test('a cut article with no wall to see: a note, and the article on request, held to a cut page', async () => {
   const page = boot({ html: unknownWall({ upsell: 'inside', popup: '', shown: false }), responses: good, scripts: quick(ARTICLE) });
   try {
@@ -2337,6 +2379,87 @@ test('a CAPTCHA on the snapshot: the button opens that page, not the lookup; not
   }
 });
 
+// The banner and the note go where the page has room for them; the status bar is in the same
+// corner on every site, so the button is there too, and stays.
+test('a CAPTCHA: the status bar has the button too, and stays up until the article is in', async () => {
+  let asked = 0;
+  const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: () => (++asked === 1 ? CHECK_PAGE : { ...ok(COMPLETE), url: snapshotUrl(T[3]) }) } });
+  try {
+    const button = await waitFor(() => page.barButton('Complete the check'));
+    assert.match(statusText(page), /wants a CAPTCHA before it sends Read Free the article/);
+    assert.equal(button.tagName, 'BUTTON');
+    button.click();
+    await sleep(0);
+    assert.deepEqual(page.opened, [[snapshotUrl(T[3]), '_blank', 'noopener']]);
+    assert.ok(page.barButton('Complete the check'), 'still there after the click: the window may be closed without it done');
+    page.visibility('hidden');
+    page.visibility('visible');
+    await waitFor(page.body);
+    assert.equal(page.barButton('Complete the check'), undefined, 'gone once the article is in');
+  } finally {
+    page.close();
+  }
+});
+
+test("a CAPTCHA, and the reader goes back to the site's version: the bar's button goes too", async () => {
+  const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE } });
+  try {
+    await waitFor(() => page.barButton('Complete the check'));
+    await page.toggle();
+    assert.equal(page.doc.getElementById('nytfix-status'), null);
+  } finally {
+    page.close();
+  }
+});
+
+test('a CAPTCHA on a page without a wall (the toolbar), so without a note: the bar has the button', async () => {
+  const page = boot({ html: livePageHtml({ wall: null }), responses: { [newestUrl(ARTICLE)]: CHECK_PAGE } });
+  try {
+    await page.started();
+    assert.deepEqual(page.fetched, []);
+    await page.toggle();
+    (await waitFor(() => page.barButton('Complete the check'))).click();
+    await sleep(0);
+    assert.equal(page.doc.querySelector('.nytfix-loading'), null);
+    assert.deepEqual(page.opened, [[snapshotUrl(T[3]), '_blank', 'noopener']]);
+  } finally {
+    page.close();
+  }
+});
+
+test("FT: a CAPTCHA puts the banner above FT's barrier page, and the button in the status bar", async () => {
+  const FT_CHECK = { ...CHECK_PAGE, url: snapshotUrl(T[3], FT_ARTICLE) };
+  const page = boot({ url: FT_ARTICLE, html: ftLivePageHtml(), responses: { [newestUrl(FT_ARTICLE)]: FT_CHECK } });
+  try {
+    const button = await waitFor(() => page.barButton('Complete the check'));
+    assert.ok(page.doc.documentElement.classList.contains('nytfix-off'), "FT's barrier page is back");
+    const main = page.doc.querySelector('main#site-content');
+    assert.equal(main.firstElementChild, page.banner(), 'the banner first, above the headline and offers');
+    assert.equal(page.banner().nextElementSibling, page.doc.getElementById('barrier-page'));
+    assert.ok(page.button('Complete the check'));
+    button.click();
+    await sleep(0);
+    assert.deepEqual(page.opened, [[snapshotUrl(T[3], FT_ARTICLE), '_blank', 'noopener']]);
+  } finally {
+    page.close();
+  }
+});
+
+// archive.ph, 2026-11-27, an FT article with no snapshot yet: Read Free's lookup got a CAPTCHA, but
+// the same lookup in a tab showed "No results" and no check; the search page showed the check.
+test('a CAPTCHA on the lookup itself: the window opens the search page for the article, where archive.today asks a visit', async () => {
+  const LOOKUP = { ...CHECK_PAGE, url: newestUrl(FT_ARTICLE) };
+  const page = boot({ url: FT_ARTICLE, html: ftLivePageHtml(), openCheck: () => true, responses: { [newestUrl(FT_ARTICLE)]: LOOKUP } });
+  try {
+    (await waitFor(() => page.barButton('Complete the check'))).click();
+    await sleep(0);
+    assert.deepEqual(page.checkWindows, ['https://archive.ph/https://www.ft.com/content/4aba8386-35cc-463b-a79c-a0c85c362c89']);
+    assert.match(statusText(page), /If it shows no check, look for the article there\./);
+  } finally {
+    page.close();
+  }
+});
+
 test('back from the check: the article is asked for once more, and goes in', async () => {
   let asked = 0;
   const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: () => (++asked === 1 ? CHECK_PAGE : { ...ok(COMPLETE), url: snapshotUrl(T[3]) }) } });
@@ -2379,6 +2502,7 @@ test('a check another page is waiting for: nothing is asked, and once it is comp
   const page = boot({ html: livePageHtml({ upsell: 'inside' }), responses: { [newestUrl(ARTICLE)]: () => (wanted ? waiting : { ...ok(COMPLETE), url: snapshotUrl(T[3]) }) }, checkWanted: () => wanted });
   try {
     await waitFor(() => page.button('Complete the check'));
+    assert.ok(page.barButton('Complete the check'));
     assert.deepEqual(page.fetched, [newestUrl(ARTICLE)], 'no list, no other address');
     page.visibility('hidden');
     page.visibility('visible');
@@ -2637,7 +2761,9 @@ test("a CAPTCHA in an incognito window: a check there doesn't count, so the arti
     const link = [...page.banner().querySelectorAll('a')].find(a => a.textContent === 'Open it on archive.ph');
     assert.equal(link.href, snapshotUrl(T[3]));
     assert.equal(link.target, '_blank');
-    assert.equal(page.doc.getElementById('nytfix-status').shadowRoot.querySelector('a.link').href, snapshotUrl(T[3]));
+    const inBar = page.barButton('Open it on archive.ph');
+    assert.equal(inBar.href, snapshotUrl(T[3]));
+    assert.equal(inBar.target, '_blank');
     inNote(page, 'Open it on archive.ph').click();
     await sleep(0);
     assert.deepEqual(page.opened, [[snapshotUrl(T[3]), '_blank', 'noopener']]);

@@ -5,7 +5,7 @@ const nyt = require('../extension/sites/nyt.js');
 const ft = require('../extension/sites/ft.js');
 const extract = require('../extension/src/extract.js');
 const paywall = require('../extension/src/paywall.js');
-const { LOREM, parse, ftSnapshotHtml, ftLivePageHtml } = require('./fixtures.js');
+const { LOREM, parse, ftSnapshotHtml, FT_LEAD, ftLivePageHtml } = require('./fixtures.js');
 
 // Every adapter has the same shape.
 for (const site of [nyt, ft]) {
@@ -93,6 +93,29 @@ test('ft: extracts the body from #article-body, with links and the photo', () =>
     alt: 'An FT photo',
     caption: 'An FT photo caption. Photographer/Agency',
   });
+});
+
+test("ft: the lead photo above the body comes first, at FT's address, with a sharper copy", () => {
+  const article = extract.extractArticle(parse(ftSnapshotHtml({ paragraphs: 8, lead: true })), ft, { baseUrl: FT_SNAPSHOT });
+  assert.deepEqual(article.blocks.map(b => b.type), ['figure', ...Array(4).fill('paragraph'), 'figure', ...Array(4).fill('paragraph')]);
+  assert.deepEqual(article.blocks[0], {
+    type: 'figure',
+    src: FT_LEAD,
+    hires: 'https://images.ft.com/v3/image/raw/ftcms%3Aabc?source=next-article&fit=scale-down&quality=highest&width=2048&dpr=1',
+    alt: 'A lead photo',
+    caption: 'A lead caption. Photographer/Agency',
+  });
+  assert.equal(article.paragraphs, 8);
+  assert.equal('left' in article, false);
+});
+
+test("ft: Flourish charts, captured broken, are left out, their notes too, and counted", () => {
+  const article = extract.extractArticle(parse(ftSnapshotHtml({ paragraphs: 8, charts: 2 })), ft, { baseUrl: FT_SNAPSHOT });
+  assert.deepEqual(article.blocks.map(b => b.type), [...Array(4).fill('paragraph'), 'figure', ...Array(4).fill('paragraph')]);
+  assert.equal(article.blocks.find(b => b.type === 'figure').src, 'https://images.ft.com/v3/image/raw/photo.jpg');
+  assert.doesNotMatch(article.blocks.map(b => b.text || '').join('\n'), /chart/i);
+  assert.equal(article.left, 2);
+  assert.deepEqual(article.leftAs, ['chart', 'charts']);
 });
 
 test('ft: leaves out the standfirst, the Recommended box and label, and reader comments', () => {

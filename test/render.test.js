@@ -211,6 +211,29 @@ test('a sharper copy of a photo goes in srcset for 2x screens, and is dropped if
   img.dispatchEvent(new doc.defaultView.Event('error'));
   assert.equal(img.hasAttribute('srcset'), false);
   assert.equal(img.src, src);
+  assert.ok(img.isConnected, 'still there for its own size');
+  img.dispatchEvent(new doc.defaultView.Event('error'));
+  assert.equal(doc.querySelector('.nytfix-body figure'), null, 'that failed too: no gap left');
+});
+
+test("a photo that doesn't load goes, caption and all, and the text stays", () => {
+  const doc = parse(livePageHtml());
+  applyTo(doc, { blocks: [
+    { type: 'paragraph', text: 'Before.', inlines: [{ text: 'Before.' }] },
+    { type: 'figure', src: 'https://archive.ph/G58Mx/broken.png', alt: '', caption: 'A caption' },
+    { type: 'paragraph', text: 'After.', inlines: [{ text: 'After.' }] },
+  ] });
+  doc.querySelector('.nytfix-body img').dispatchEvent(new doc.defaultView.Event('error'));
+  assert.equal(doc.querySelector('.nytfix-body figure'), null);
+  assert.equal(doc.querySelector('.nytfix-body').textContent.replace(/\s+/g, ''), 'Before.After.');
+});
+
+test("a snapshot's charts that couldn't come along are counted in the banner", () => {
+  for (const [left, said] of [[1, 'A chart couldn\'t come along.'], [2, '2 charts couldn\'t come along.']]) {
+    const doc = parse(livePageHtml());
+    applyTo(doc, { blocks: [{ type: 'paragraph', text: 'Text.', inlines: [{ text: 'Text.' }] }], left, leftAs: ['chart', 'charts'] });
+    assert.match(doc.getElementById('nytfix-banner').textContent, new RegExp(`^Full text from the archive\\.today snapshot of .+\\. ${said}`));
+  }
 });
 
 test('an unsafe sharper copy is ignored; the photo keeps its own address', () => {

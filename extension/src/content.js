@@ -215,7 +215,8 @@
     stopWatching = paywall.watch(document, site, () => {
       if (!loading && !applied() && !userRestored && missed !== 'hidden') activate();
     });
-    const free = () => siteOn() && !loading && !applied() && !userRestored && !missed;
+    // Not while archive.today's check is waiting either: its button is in the status bar.
+    const free = () => siteOn() && !loading && !applied() && !userRestored && !missed && !checkWaiting;
     stopMissed = paywall.watchMissed(document, site, {
       // Site CSS is hiding something the site would be showing, and nothing here will undo what
       // comes with it: the site's version, rather than a page that's held for no visible reason.
@@ -523,17 +524,23 @@
   }
   const tryAgain = { text: 'Try again', onClick: retry };
 
-  // archive.today wants a CAPTCHA, which is the reader's to complete: in a tab, on the page that
-  // asked. It may not show one there: it can ask scripts for one and not a page the reader opens (the
+  // archive.today wants a CAPTCHA, which is the reader's to complete: on the snapshot that asked, or
+  // for a lookup, on its search page for the article (archive.checkPage: /newest/ shows a visit none
+  // when there's no snapshot yet). It may not show one there: it can ask scripts for one and not a page the reader opens (the
   // user's Chrome, 2026-11-25: the article in a tab; a CAPTCHA to a script on that very page, with the
   // same cookies). Then the archived copy is there to read; Read Free doesn't pass its requests off as
   // page visits. If there was one (as on WSJ that day), its cookie goes with Read Free's own requests, so when the reader
   // comes back the article is asked for again, once. A check completed from another article's page
   // counts too: this one sees that when the reader gets to it (nytfix:check).
+  // The button is in the status bar too, which stays up: the banner and the note go where the page
+  // has room for them (on FT, under its subscription page), but the bar is in the same corner on
+  // every site. status: that bar, taken down once there's nothing more to wait for.
   let stopWaiting = () => {};
   let onChecked = () => {};
-  function waitForCheck(check) {
+  let checkWaiting = false;
+  function waitForCheck(check, status) {
     stopWaiting();
+    checkWaiting = true;
     const gen = generation;
     let opened = false;
     let asking = false;
@@ -551,6 +558,8 @@
     for (const [target, name] of events) target.addEventListener(name, back);
     stopWaiting = () => {
       for (const [target, name] of events) target.removeEventListener(name, back);
+      status.remove();
+      checkWaiting = false;
       onChecked = () => {};
       stopWaiting = () => {};
     };
@@ -600,7 +609,7 @@
     const host = new URL(url).hostname;
     const wantsCheck = (check, own) => new FixError(incognito
       ? `${host} wants a CAPTCHA, which Read Free can't get past in ${settingsLib.isFirefox() ? 'a private' : 'an incognito'} window. Read the article on ${host} instead.`
-      : `${host} wants a CAPTCHA before it sends Read Free the article. Complete the check in a small window, and the article loads here by itself. If it shows the article instead, read it there.`, { blocked: true, check: archive.isArchiveUrl(check) ? check : url, own });
+      : `${host} wants a CAPTCHA before it sends Read Free the article. Complete the check in a small window, and the article loads here by itself. If it shows no check, look for the article there.`, { blocked: true, check: archive.checkPage(archive.isArchiveUrl(check) ? check : url), own });
     if (!res.ok) {
       if (res.reason === 'check') throw wantsCheck(res.check, false); // another article's
       if (res.reason) console.info(`[Read Free] ${host}: ${res.error} (${res.reason})`);
@@ -691,7 +700,7 @@
         if (stale()) return null;
         const article = extract.extractArticle(new DOMParser().parseFromString(body, 'text/html'), site, { baseUrl: snapshotUrl, articleUrl });
         if (!article || article.paragraphs < extract.MIN_PARAGRAPHS) return null;
-        const snapshot = { blocks: article.blocks, snapshotUrl, snapshotTime, chars: article.chars };
+        const snapshot = { blocks: article.blocks, snapshotUrl, snapshotTime, chars: article.chars, ...(article.left ? { left: article.left, leftAs: article.leftAs } : {}) };
         return { snapshot, complete: extract.isComplete(article, live.chars, { paywalled }) };
       };
       const tried = []; // times of the snapshots fetched so far
@@ -807,8 +816,8 @@
       // was this article's; else the newest.
       const page = captcha && incognito ? (e.own && archive.mementoAt(e.check) ? e.check : archive.newestUrl(articleUrl, mirror)) : null;
       const readThere = page ? { text: `Open it on ${mirror}`, href: page } : null;
-      const check = captcha && !readThere ? waitForCheck(e.check) : null;
-      status.finish('error', message, readThere ? { link: readThere, hideAfterMs: 15000 } : {});
+      const check = captcha && !readThere ? waitForCheck(e.check, status) : null;
+      status.finish('error', message, check || readThere ? { action: check || readThere } : {});
       placeholder?.finish('error', `Couldn't load the rest of this article. ${message}`, { action: check || (readThere ? { text: readThere.text, onClick: () => window.open(page, '_blank', 'noopener') } : tryAgain) });
       showWallIfNothingToRead(paywalled);
       render.showBanner(document, site, {

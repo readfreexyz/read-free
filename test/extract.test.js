@@ -182,3 +182,23 @@ test('drops link-only lines and headings (pointers to other stories) and video p
   assert.equal(article.blocks.length, 3);
   assert.ok(article.blocks.every(b => b.type === 'paragraph' && b.text.startsWith(LOREM.slice(0, 20))));
 });
+
+// site.snapshot.lead: a lead photo outside the body (FT's)
+test('a lead photo the adapter points to comes first, but only one before the body', () => {
+  const page = before => `<html><body><div id="CONTENT">${before}<section name="articleBody"><figure><img currentsourceurl="https://static01.nyt.com/in.jpg" alt="In the body"></figure><div>One paragraph of placeholder text.</div></section><figure><img currentsourceurl="https://static01.nyt.com/after.jpg" alt="After"></figure></div></body></html>`;
+  const LEAD = '<figure><img currentsourceurl="https://static01.nyt.com/lead.jpg" alt="Lead"></figure>';
+  const altsWith = (lead, html) => extract.extractArticle(parse(html), { ...nyt, snapshot: { ...nyt.snapshot, lead } }, { baseUrl: SNAPSHOT }).blocks.map(b => b.alt || b.type);
+  assert.deepEqual(altsWith('#CONTENT figure', page(LEAD)), ['Lead', 'In the body', 'paragraph']);
+  assert.deepEqual(altsWith('#CONTENT figure', page('')), ['In the body', 'paragraph'], "the body's own photo is not taken twice");
+  assert.deepEqual(altsWith('#CONTENT > figure', page(LEAD)), ['Lead', 'In the body', 'paragraph']);
+  assert.deepEqual(altsWith('#CONTENT > figure', page('')), ['In the body', 'paragraph'], 'nor one after the body');
+  assert.deepEqual(extractFrom(page(LEAD)).blocks.map(b => b.alt || b.type), ['In the body', 'paragraph'], 'not without the adapter saying so');
+});
+
+test('a Flourish chart outside a figure: its text is left out, and it is counted', () => {
+  const article = extractFrom(bodyOf(`<div>One paragraph of placeholder text.</div>
+    <div id="fl-layout-wrapper-outer"><div>A chart's subtitle, long enough to look like a sentence of article prose.</div></div>
+    <div>Another paragraph of placeholder text.</div>`));
+  assert.deepEqual(article.blocks.map(b => b.text), ['One paragraph of placeholder text.', 'Another paragraph of placeholder text.']);
+  assert.equal(article.left, 1);
+});

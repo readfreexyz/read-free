@@ -133,3 +133,41 @@ test('clicking a finished bar dismisses it, but clicking while working does not'
   q('.bar').click();
   assert.equal(bar.host.isConnected, false);
 });
+
+// archive.today's CAPTCHA: the bar is the one place every site shows, so its button stays
+test('an action: a button that stays past the hide time, the pointer leaving, and its own click', async () => {
+  const { doc, bar, q } = setup();
+  let clicks = 0;
+  bar.finish('error', 'archive.ph wants a CAPTCHA.', { action: { text: 'Complete the check', onClick: () => clicks++ }, hideAfterMs: 10 });
+  const button = q('.act button');
+  assert.equal(button.textContent, 'Complete the check');
+  q('.bar').dispatchEvent(new doc.defaultView.Event('mouseenter'));
+  q('.bar').dispatchEvent(new doc.defaultView.Event('mouseleave'));
+  await new Promise(r => setTimeout(r, 400));
+  assert.equal(bar.host.isConnected, true, 'still up');
+  assert.equal(q('.bar').classList.contains('hide'), false);
+  button.click();
+  button.click();
+  assert.equal(clicks, 2);
+  q('.bar').click();
+  assert.equal(bar.host.isConnected, true, 'not dismissed by a click on the bar');
+  q('.close').click();
+  assert.equal(bar.host.isConnected, false, 'its × closes it');
+});
+
+test('an action can be a link (https only), and stays too', async () => {
+  const { bar, q } = setup();
+  bar.finish('error', 'Read it there.', { action: { text: 'Open it on archive.ph', href: 'https://archive.ph/20261114130000/x' }, hideAfterMs: 10 });
+  const a = q('.act a');
+  assert.equal(a.href, 'https://archive.ph/20261114130000/x');
+  assert.equal(a.target, '_blank');
+  assert.equal(a.textContent, 'Open it on archive.ph \u2197');
+  await new Promise(r => setTimeout(r, 400));
+  assert.equal(bar.host.isConnected, true);
+  bar.remove();
+  const other = setup();
+  other.bar.finish('error', 'Bad.', { action: { text: 'Bad', href: 'javascript:alert(1)' }, hideAfterMs: 10 });
+  assert.equal(other.q('.act'), null);
+  await new Promise(r => setTimeout(r, 400));
+  assert.equal(other.bar.host.isConnected, false, 'nothing to keep it up for');
+});

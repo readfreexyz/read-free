@@ -45,6 +45,18 @@
     return `https://${mirror}/${articleUrl}`;
   }
 
+  // The page for the reader to complete a CAPTCHA that archive.today asked Read Free for. A snapshot
+  // is opened as it is. A lookup (/newest/, /timemap/) gives way to the search page for the article:
+  // for one with no snapshot yet, /newest/ answers a visit with "No results" and no check, while the
+  // search page asks for one (archive.ph, 2026-11-27, the same browser minutes apart). The search page
+  // lists the snapshots there are, or offers to archive it. Anything else is left as it is.
+  function checkPage(url) {
+    if (!isArchiveUrl(url)) return url;
+    const u = new URL(url);
+    const lookup = /^\/(?:newest|timemap)\/(https?:\/\/.+)$/.exec(u.pathname + u.search);
+    return lookup ? searchUrl(lookup[1], u.hostname) : url;
+  }
+
   // Parse an application/link-format timemap. Returns mementos oldest first:
   // [{ url, time }] where time is epoch ms.
   function parseTimemap(text) {
@@ -90,7 +102,7 @@
 
   const archive = {
     MIRRORS, DEFAULT_MIRROR, secondMirror,
-    newestUrl, timemapUrl, mementoAt, searchUrl, parseTimemap, newestFirst, toMirror, isArchiveUrl, looksBlocked,
+    newestUrl, timemapUrl, mementoAt, searchUrl, checkPage, parseTimemap, newestFirst, toMirror, isArchiveUrl, looksBlocked,
   };
   root.NYTFix = Object.assign(root.NYTFix || {}, { archive });
   if (typeof module === 'object' && module.exports) module.exports = archive;

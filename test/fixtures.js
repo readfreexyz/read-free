@@ -43,17 +43,27 @@ function snapshotHtml({ paragraphs = 12, extras = true, section = true } = {}) {
 // An FT snapshot, shaped like the three sampled (docs/multi-site-investigation.md): the body in
 // article#site-content[role=main] > div > article#article-body, the standfirst outside it, a
 // "Recommended" box in an <aside>, and reader comments in a separate <main>.
-function ftSnapshotHtml({ paragraphs = 8 } = {}) {
+// lead: the lead photo above the body, and charts: Flourish charts in the body, as in the
+// snapshot of 2026-11-27 (collapsed, their images broken, in a figure in a div with a made-up id).
+const FT_LEAD = 'https://images.ft.com/v3/image/raw/ftcms%3Aabc?source=next-article&fit=scale-down&quality=highest&width=1440&dpr=1';
+const ftChart = n => `<div id="chart${n}"><figure><div><div><div><div><div><img old-position="fixed" loading="lazy" src="/AbCdE/chart${n}.png"></div></div></div></div></div>
+  <div><div id="fl-layout-wrapper-outer"><main id="fl-layout-wrapper"><section id="fl-layout-header-container"><div id="fl-layout-header"><header><div><img currentsourceurl="https://public.flourish.studio/uploads/1/logo.png" src="data:image/png;base64,AAAA" alt="Flourish logo"></div><h1>Chart title ${n}</h1></header></div></section>
+    <div>A chart's own note, long enough to look like a sentence of article prose, which is not the article's.</div>
+    <section id="fl-layout-primary-container"><div id="fl-layout-primary"><a href="https://archive.ph/o/AbCdE/https://flourish.studio/"><div id="fl-layout-wrapper-outer"><div>A chart inside the chart.</div></div></a></div></section></main></div></div></figure></div>`;
+function ftSnapshotHtml({ paragraphs = 8, lead = false, charts = 0 } = {}) {
   const para = i => `<div style="font-family:metric">FT paragraph ${i}. ${LOREM} See <a href="https://archive.ph/o/AbCdE/https://www.ft.com/content/11111111-2222-3333-4444-555555555555">a related report</a>.</div>`;
   const paras = Array.from({ length: paragraphs }, (_, i) => para(i + 1));
   const half = Math.ceil(paragraphs / 2);
   return `<!doctype html><html><head><title>Snapshot</title></head><body><center>
   <div id="HEADER">archive.today webpage capture</div>
   <div id="CONTENT"><div class="html1"><div class="body"><div>
-    <article id="site-content" role="main"><div>
+    <article id="site-content" role="main">
+      ${lead ? `<div><figure><picture><img currentsourceurl="${FT_LEAD}" alt="A lead photo" loading="lazy" src="/AbCdE/lead.avif"></picture><figcaption><span>A lead caption.</span><span>Photographer/Agency</span></figcaption></figure></div>` : ''}
+      <div>
       <div><h1>Headline</h1><div>A standfirst that is long enough to look like a sentence of article prose, but sits outside the body.</div></div>
       <article id="article-body">
         ${paras.slice(0, half).join('')}
+        ${Array.from({ length: charts }, (_, i) => ftChart(i + 1)).join('')}
         <figure><img src="/AbCdE/ft.jpg" currentsourceurl="https://images.ft.com/v3/image/raw/photo.jpg" alt="An FT photo">
           <figcaption><span>An FT photo caption.</span><span>Photographer/Agency</span></figcaption></figure>
         <aside><div>Recommended</div><a href="https://archive.ph/o/AbCdE/https://www.ft.com/content/66666666-7777-8888-9999-000000000000"><div>A recommended FT story with a fairly long headline here</div></a></aside>
@@ -654,4 +664,4 @@ module.exports = {
   nineLivePageHtml, nineSnapshotHtml, wsjLivePageHtml, wsjSnapshotHtml, spiegelLivePageHtml, spiegelSnapshotHtml, lemondeLivePageHtml, lemondeSnapshotHtml,
   nationalpostLivePageHtml, nationalpostSnapshotHtml, corriereLivePageHtml, corriereHomeHtml, spectatorLivePageHtml,
   reutersLivePageHtml, lalibreLivePageHtml, lalibrePianoOffer, dailymailLivePageHtml, usatodayLivePageHtml,
-  LOREM, parse, snapshotHtml, ftSnapshotHtml, ftLivePageHtml, livePageHtml, nytData, withData, inline, block, interactivePageHtml, pinInteractive, EXIT_NOTE, raiseWall, TIMEMAP, timemapFor, mementoUrl, memoryArea };
+  LOREM, parse, snapshotHtml, ftSnapshotHtml, FT_LEAD, ftLivePageHtml, livePageHtml, nytData, withData, inline, block, interactivePageHtml, pinInteractive, EXIT_NOTE, raiseWall, TIMEMAP, timemapFor, mementoUrl, memoryArea };

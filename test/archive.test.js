@@ -106,3 +106,18 @@ test('looksBlocked: a CAPTCHA page, not a page that mentions one', () => {
   ]) assert.equal(looksBlocked(200, page), null, page);
   assert.equal(looksBlocked(429, ''), 'rate-limited');
 });
+
+// The page the reader completes a CAPTCHA on: a lookup's own address shows a visit no check when
+// there's no snapshot yet (archive.ph, 2026-11-27), so it's the search page there
+test('checkPage: a snapshot as it is; a lookup gives way to the search page at the same address', () => {
+  const article = 'https://www.ft.com/content/4aba8386-35cc-463b-a79c-a0c85c362c89';
+  const snapshot = 'https://archive.is/20261114130000/https://www.ft.com/content/4aba8386-35cc-463b-a79c-a0c85c362c89';
+  assert.equal(archive.checkPage(snapshot), snapshot);
+  assert.equal(archive.checkPage(archive.newestUrl(article)), `https://archive.ph/${article}`);
+  assert.equal(archive.checkPage(archive.newestUrl(article, 'archive.is')), `https://archive.is/${article}`);
+  assert.equal(archive.checkPage(archive.timemapUrl(article, 'archive.ph')), `https://archive.ph/${article}`);
+  assert.equal(archive.checkPage(archive.newestUrl('https://www.example.com/a?id=7')), 'https://archive.ph/https://www.example.com/a?id=7');
+  assert.equal(archive.checkPage(`https://archive.ph/${article}`), `https://archive.ph/${article}`);
+  assert.equal(archive.checkPage('https://archive.ph/'), 'https://archive.ph/');
+  assert.equal(archive.checkPage('https://evil.example/newest/https://www.ft.com/'), 'https://evil.example/newest/https://www.ft.com/');
+});

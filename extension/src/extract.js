@@ -15,6 +15,8 @@
 //   { type: 'heading', text }
 //   { type: 'figure', src, hires?, alt, caption }
 //   { type: 'break' }  between sections of the article (sites that say where they are)
+//   The article's lead photo comes first when the adapter says where a snapshot keeps it outside
+//   the body (site.snapshot.lead: FT's sits above the article).
 //   hires: a sharper copy of the same photo (for 2x screens), when the site adapter knows how to
 //   ask the site's image server for one (site.snapshot.hiresImage). Snapshots drop srcset, so all
 //   that's left is the one size the page happened to load when it was captured.
@@ -189,6 +191,19 @@
     return typeof hires === 'string' && /^https:\/\//i.test(hires) && hires !== src ? hires : null;
   }
 
+  // Flourish charts (FT, and many other outlets) are drawn in a frame, which archive.today copies
+  // into the page. The ones seen (FT, 2026-11-27) came out collapsed, their images broken, so
+  // there's nothing to carry over: they're left out, and counted (extractArticle's left).
+  const CHART = '#fl-layout-wrapper-outer';
+
+  // site.snapshot.lead: where a snapshot keeps the article's lead photo (a figure) outside the
+  // body. Only one before the body counts.
+  function leadFigure(content, body, base, site) {
+    const lead = site.snapshot.lead ? content.querySelector(site.snapshot.lead) : null;
+    if (!lead || !(body.compareDocumentPosition(lead) & 2)) return null; // 2: PRECEDING (not inside it, nor after)
+    return figureBlock(lead, base, site);
+  }
+
   function figureBlock(figure, base, site) {
     const img = figure.querySelector('img');
     // A linked image is a card for another story (The Atlantic's "related" lists put 80-pixel
@@ -209,11 +224,16 @@
 
   // baseUrl: the snapshot's own URL, for resolving relative links and image paths.
   // articleUrl: the article's own URL, for sites whose snapshots hold several articles.
-  // Returns { blocks, paragraphs, chars } or null.
+  // Returns { blocks, paragraphs, chars, left?, leftAs? } or null. left: charts that couldn't come
+  // along (leftAs: how to say so).
   function extractArticle(doc, site, { baseUrl, articleUrl } = {}) {
     const body = findArticleBody(doc, site, articleUrl);
     if (!body) return null;
     const base = baseUrl || doc.baseURI;
+    // One per chart: FT's second chart that day held two more inside it.
+    const charts = [...body.querySelectorAll(CHART)].filter((chart, _, all) => !all.some(other => other !== chart && other.contains(chart)));
+    // A chart, inside one, or holding one (its figure)
+    const ofChart = el => charts.some(chart => chart.contains(el) || el.contains(chart));
     const siteJunk = site.snapshot.junk;
     const isJunk = text => JUNK.test(text) || Boolean(siteJunk && siteJunk.test(text));
     const skipSelector = site.snapshot.skip ? `${SKIP_SELECTOR}, ${site.snapshot.skip}` : SKIP_SELECTOR;
@@ -229,10 +249,12 @@
       .filter(li => li && body.contains(li));
     const inCard = el => cards.some(card => card.contains(el));
     const blocks = [];
+    const lead = leadFigure(doc.getElementById('CONTENT') || doc.body, body, base, site);
+    if (lead) blocks.push(lead);
     let taken = null;
     for (const el of body.querySelectorAll('div, p, h2, h3, figure')) {
       if (taken && taken.contains(el)) continue;
-      if (inCard(el)) continue;
+      if (inCard(el) || ofChart(el)) continue;
       if (el.tagName === 'FIGURE') {
         if (insideSkipped(el.parentElement, body) || inSkipped(el)) continue;
         const figure = figureBlock(el, base, site);
@@ -253,6 +275,7 @@
       blocks,
       paragraphs: paragraphs.length,
       chars: paragraphs.reduce((n, b) => n + b.text.length, 0),
+      ...(charts.length ? { left: charts.length, leftAs: ['chart', 'charts'] } : {}),
     };
   }
 

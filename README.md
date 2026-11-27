@@ -227,9 +227,14 @@ otherwise stops extension storage at 10 MB).
   in with what happened, the outlet and the versions; never the article's address (paste it if you want that page looked at). Nothing is
   sent unless you send it.
 - **A CAPTCHA** is archive.today's to ask for and yours to complete; Read Free never goes around
-  one, or passes its requests off as page visits. **Complete the check** opens the page that asked in
-  a small window (archive.today doesn't allow itself to be shown inside another page). Once you have,
-  the article loads and the window closes. archive.today may show you the article there instead, with
+  one, or passes its requests off as page visits. **Complete the check** is in the banner, the note
+  and the notification in the corner, which stays up until the article is in or you close it, since
+  it's in the same place on every site (on FT, whose page has no article of its own, the banner goes
+  above FT's subscription offers). It opens archive.today in a small window (it doesn't allow itself
+  to be shown inside another page): the snapshot that asked, or, when it asked while looking the
+  article up, its search page for the article, since a visit to the lookup itself shows no check when
+  there's no snapshot yet. Once you have,
+  the article loads (or Read Free says there's no snapshot yet) and the window closes. archive.today may show you the article there instead, with
   no CAPTCHA, though it asked Read Free for one: read it there. In an incognito window a check doesn't
   count for Read Free, so its notification links to the article on archive.today instead. Other articles that were waiting do so too, once that worked and you get to them. Until
   then, or for a minute, it doesn't ask archive.today for any other article. It asks for one
@@ -343,7 +348,7 @@ daily check on GitHub (`.github/workflows/site-health.yml`), and readers' report
 | The New York Times | `sites/nyt.js`, `sites/nyt.css`: everything in this README. NYT Cooking (cooking.nytimes.com) is part of it, with settings of its own: the page sends the whole recipe, and its wall clips it to 250px, makes it `inert` and draws a sign-up box. The clip and the box come off, with nothing fetched. If ingredients are missing, archive.today fills in (provisional). |
 | The Atlantic | `sites/atlantic.js`, `sites/atlantic.css`. Past the meter, the paywall service (Zephr) cuts the body to a few paragraphs, so the wall is detected from the cut: the article is marked paywalled in its structured data and the body holds under 600 words. CSS hides Zephr's gate slots. The page's data holds the whole article, so it's shown from there, with nothing fetched: its photos (The Atlantic's resized copies, sharper ones on 2x screens) and a break between sections, as in the magazine. If it doesn't, the archived text replaces the cut body. Seen past the meter in Nov 2026: three or four paragraphs left, then Zephr's offer. |
 | The New Yorker | `sites/newyorker.js`, `sites/newyorker.css`, `page/newyorker.js`. The page sends the whole article. Seconds in, Condé Nast's subscription engine puts an offer in it and deletes everything after the first paragraph, again whenever it's put back. The guard refuses those deletions, so the article is never cut; the offer is hidden, and nothing is fetched. If the text is cut all the same, archive.today fills in. The paywall modal (hidden too) hasn't been seen filled. |
-| Financial Times | `sites/ft.js`, `sites/ft.css`. FT shows non-subscribers a "barrier page" instead of the article: the headline plus offers, with no article text at all. `ft.css` trims it to the headline before first paint, and the archived article is inserted below the headline with a loading box while it loads. If archive.today can't help, FT's barrier page comes back. |
+| Financial Times | `sites/ft.js`, `sites/ft.css`. FT shows non-subscribers a "barrier page" instead of the article: the headline plus offers, with no article text at all. `ft.css` trims it to the headline before first paint, and the archived article is inserted below the headline with a loading box while it loads, starting with the lead photo, which snapshots keep above the article body (`snapshot.lead`). FT's Flourish charts come out of archiving collapsed, so they're left out and the banner counts them. If archive.today can't help, FT's barrier page comes back. |
 | Los Angeles Times | `sites/latimes.js`. Seen past the meter: the page sends the whole article. On gated articles all but a few preview paragraphs sit in a hidden `div.subscriber-content.hidden` block, photos included, under a metering popup (`modality-custom-element[name=metering-modal]`) with scrolling locked (`body.met-panel-open`). The popup is hidden, the block shown and scrolling unlocked; nothing is fetched. Stories and newsletters, also in Spanish. On lists, recipes, projects and undated stories only the popup comes off. |
 | Toronto Star | `sites/thestar.js`. Sends every paragraph, hiding all but the first two in `.subscriber-only` blocks (`display: none`). They're shown, and the offers popup hidden. Built from the pages it sends; not yet checked in a browser. |
 | CNN, Newsweek, The Globe and Mail | `sites/cnn.js` (also us.cnn.com, edition.cnn.com and CNN en Español), `sites/newsweek.js`, `sites/globeandmail.js`. They send the whole article too, but their walls (Piano on CNN and Newsweek, Zephr on the Globe) haven't been seen in action. So the check is general: a paid article with text cut short, locked scrolling or its end hidden, or (CNN, Newsweek) Piano's modal showing. With the text there, the wall comes off; if it was cut, archive.today fills in. Provisional. |
@@ -469,7 +474,8 @@ both.
   (`page/piano-adblock.js`) runs before any setting can be read, so its ad-blocker popup stays
   away even there.
 - Only paragraphs, subheadings, photos and (on The Atlantic) section breaks are carried over. Videos, interactive graphics and
-  embedded posts in an article aren't.
+  embedded posts in an article aren't; Flourish charts in a snapshot are counted in the banner. A photo
+  that doesn't load is left out rather than leave a gap.
 - The 1.5× rule for a complete snapshot comes from one NYT article. Short articles fall below it
   (see the incomplete snapshots bullet above).
 - In-page navigation handling has only been tested on a simulated page, not on nytimes.com itself.

@@ -38,6 +38,10 @@
       // Three samples: article#site-content[role=main] > div > article#article-body. The
       // "Recommended" box sits in an <aside> inside it (skipped), comments in a separate <main>.
       body: ['#article-body'],
+      // The lead photo sits above the body (article#site-content > div > figure > picture > img,
+      // FT's own address kept: images.ft.com, width=1440; seen 2026-11-27). The live barrier page
+      // has none, so it goes first, under the headline.
+      lead: '#site-content figure',
       junk: /^(recommended|follow the topics in this article)$/i,
       // FT's image service resizes on request: ?width=490 in the snapshots checked. Twice that
       // loads fine.
